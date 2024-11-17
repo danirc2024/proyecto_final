@@ -1,9 +1,13 @@
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+
 import customtkinter as ctk
 import tkinter as tk
 from PIL import Image
 from tkinter import ttk
 from CTkMessagebox import CTkMessagebox
-from fpdf import FPDF
 from datetime import datetime
 import re
 
@@ -257,47 +261,64 @@ class PestañasPrincipal(ctk.CTk):
         total = sum(float(self.tree_pedido.item(item, "values")[2]) * int(self.tree_pedido.item(item, "values")[1]) for item in self.tree_pedido.get_children())
         self.total_label.configure(text=f"Total: ${total:.2f}")
 
+
+    #utiliza el ReportLab para generar la boleta, si no lo tienen es una extencion [ pip install ReportLab ]
     def generar_boleta(self):
         if not self.pedido:
             CTkMessagebox(title="Error", message="No hay elementos en el pedido para generar una boleta.", icon="warning")
             return
 
         total_precio = sum(menu_item.precio * menu_item.cantidad for menu_item in self.pedido)
+        # Crear el documento PDF
+        nombre_archivo = "boleta.pdf"
+        pdf = SimpleDocTemplate(nombre_archivo, pagesize=A4)
+        elementos = []
+        estilos = getSampleStyleSheet()
+        
+        # Título de la boleta
+        titulo = Paragraph("Boleta de Pedido", estilos['Title'])
+        elementos.append(titulo)
+        elementos.append(Spacer(1, 12))  # Espacio después del título
 
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        pdf.cell(200, 10, txt=f"Boleta Restaurante - {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}", ln=True, align='C')
-        pdf.ln(10)
-        pdf.cell(200, 10, txt="Razon Social del Negocio", ln=True)
-        pdf.ln(0)
-        pdf.cell(200, 10, txt="RUT: 12345678-9", ln=True)
-        pdf.ln(0)
-        pdf.cell(200, 10, txt="Direccion: Calle falsa 132", ln=True)
-        pdf.ln(0)
-        pdf.cell(200, 10, txt="Telefono: +56 9 1234 5678", ln=True)
-        pdf.ln(0)
+        # Fecha de la boleta
+        fecha = Paragraph(f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", estilos['Normal'])
+        elementos.append(fecha)
+        elementos.append(Spacer(1, 12))  # Espacio después de la fecha
 
-        pdf.ln(10)
-        pdf.cell(200, 10, txt="Detalles del Pedido:", ln=True, align='L')
+        # Tabla de contenido del pedido
+        datos = [["Nombre del Menú", "Cantidad", "Precio Unitario", "Total"]]
+        total_pedido = 0
+        
+        for item in self.pedido:
+            nombre = item.nombre  # Acceder al atributo 'nombre' del objeto item
+            cantidad = item.cantidad  # Acceder al atributo 'cantidad' del objeto item
+            precio = item.precio  # Acceder al atributo 'precio' del objeto item
+            total = precio * cantidad
+            datos.append([nombre, cantidad, f"${precio:.2f}", f"${total:.2f}"])
+            total_pedido += total
 
-        for menu_item in self.pedido:
-            pdf.cell(200, 10, txt=f"{menu_item.nombre} - Precio: ${menu_item.precio} - Cantidad: {menu_item.cantidad}", ln=True, align='L')
+        # Agregar fila con el total final
+        datos.append(["", "", "Total", f"${total_pedido:.2f}"])
 
-        # Calcular IVA (19%)
-        iva = total_precio * 0.19
-        total_con_iva = total_precio + iva
+        # Crear la tabla en ReportLab
+        tabla = Table(datos)
+        tabla.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
 
-        pdf.ln(10)
-        pdf.cell(200, 10, txt=f"Subtotal: ${total_precio:.2f}", ln=True, align='C')
-        pdf.cell(200, 10, txt=f"IVA (19%): ${iva:.2f}", ln=True, align='C')
-        pdf.cell(200, 10, txt=f"Total: ${total_con_iva:.2f}", ln=True, align='C')
+        elementos.append(tabla)
+        elementos.append(Spacer(1, 12))  # Espacio después de la tabla
 
-        # Usar un nombre de archivo fijo para sobrescribir
-        nombre_archivo = "boleta_actual.pdf"
-        pdf.output(nombre_archivo)
-
-        CTkMessagebox(title="Boleta Generada", message=f"Boleta generada correctamente: {nombre_archivo}", icon="info")
+        # Generar el PDF
+        pdf.build(elementos)
+        CTkMessagebox(title="Boleta Generada", message=f"La boleta se ha generado correctamente como '{nombre_archivo}'.", icon="info")
 
 
 if __name__ == "__main__":
