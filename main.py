@@ -6,10 +6,15 @@ from reportlab.lib.styles import getSampleStyleSheet
 import customtkinter as ctk
 import tkinter as tk
 from PIL import Image
-from tkinter import ttk
+from tkinter import messagebox,ttk
 from CTkMessagebox import CTkMessagebox
 from datetime import datetime
 import re
+from crud.cliente_crud import ClienteCRUD
+from database import get_session, engine, Base
+
+# Crear las tablas en la base de datos
+Base.metadata.create_all(bind=engine)
 
 class Ingreso_Ingredientes:
     def __init__(self, nombre_ingrediente, cantidad):
@@ -40,6 +45,9 @@ class PestañasPrincipal(ctk.CTk):
     def crear_pestanas(self):
         self.tab1 = self.tabview.add("Ingreso De Ingredientes")
         self.tab2 = self.tabview.add("Pedido")
+        # Pestaña de Clientes
+        self.tab_clientes = self.tabview.add("Clientes")
+        self.crear_formulario_cliente(self.tab_clientes)
         self.configurar_pestana1()
         self.configurar_pestana2()
 
@@ -168,6 +176,118 @@ class PestañasPrincipal(ctk.CTk):
             self.tree.delete(item)
 
         self.actualizar_treeview()
+
+    def crear_formulario_cliente(self, parent):
+        """Crea el formulario en el Frame superior y el Treeview en el Frame inferior para la gestión de clientes."""
+        # Frame superior para el formulario y botones
+        frame_superior = ctk.CTkFrame(parent)
+        frame_superior.pack(pady=10, padx=10, fill="x")
+
+        ctk.CTkLabel(frame_superior, text="Nombre").grid(row=0, column=0, pady=10, padx=10)
+        self.entry_nombre = ctk.CTkEntry(frame_superior)
+        self.entry_nombre.grid(row=0, column=1, pady=10, padx=10)
+
+        ctk.CTkLabel(frame_superior, text="Email").grid(row=0, column=2, pady=10, padx=10)
+        self.entry_email = ctk.CTkEntry(frame_superior)
+        self.entry_email.grid(row=0, column=3, pady=10, padx=10)
+
+        # Botones alineados horizontalmente en el frame superior
+        self.btn_crear_cliente = ctk.CTkButton(frame_superior, text="Crear Cliente", command=self.crear_cliente)
+        self.btn_crear_cliente.grid(row=1, column=0, pady=10, padx=10)
+
+        self.btn_actualizar_cliente = ctk.CTkButton(frame_superior, text="Actualizar Cliente", command=self.actualizar_cliente)
+        self.btn_actualizar_cliente.grid(row=1, column=1, pady=10, padx=10)
+
+        self.btn_eliminar_cliente = ctk.CTkButton(frame_superior, text="Eliminar Cliente", command=self.eliminar_cliente)
+        self.btn_eliminar_cliente.grid(row=1, column=2, pady=10, padx=10)
+
+        # Frame inferior para el Treeview
+        frame_inferior = ctk.CTkFrame(parent)
+        frame_inferior.pack(pady=10, padx=10, fill="both", expand=True)
+
+        # Treeview para mostrar los clientes
+        self.treeview_clientes = ttk.Treeview(frame_inferior, columns=("Email", "Nombre"), show="headings")
+        self.treeview_clientes.heading("Email", text="Email")
+        self.treeview_clientes.heading("Nombre", text="Nombre")
+        self.treeview_clientes.pack(pady=10, padx=10, fill="both", expand=True)
+
+        self.cargar_clientes()
+
+    # Método para actualizar los correos electrónicos en el Combobox
+    # def actualizar_emails_combobox(self):
+    #     """Llena el Combobox con los emails de los clientes."""
+    #     db = next(get_session())
+    #     emails = [cliente.email for cliente in ClienteCRUD.leer_clientes(db)]
+    #     self.combobox_cliente_email['values'] = emails
+    #     db.close()
+
+    # Métodos CRUD para Clientes
+    def cargar_clientes(self):
+        db = next(get_session())
+        self.treeview_clientes.delete(*self.treeview_clientes.get_children())
+        clientes = ClienteCRUD.leer_clientes(db)
+        for cliente in clientes:
+            self.treeview_clientes.insert("", "end", values=(cliente.email, cliente.nombre))
+        db.close()
+
+    def crear_cliente(self):
+        nombre = self.entry_nombre.get()
+        email = self.entry_email.get()
+        if nombre and email :
+            db = next(get_session())
+            cliente = ClienteCRUD.crear_cliente(db, nombre, email)
+            if cliente:
+                messagebox.showinfo("Éxito", "Cliente creado correctamente.")
+                self.cargar_clientes()
+                #self.actualizar_emails_combobox()   Actualizar el Combobox con el nuevo email
+            else:
+                messagebox.showwarning("Error", "El cliente ya existe.")
+            db.close()
+        else:
+            messagebox.showwarning("Campos Vacíos", "Por favor, ingrese todos los campos.")
+
+    def actualizar_cliente(self):
+        selected_item = self.treeview_clientes.selection()
+        if not selected_item:
+            messagebox.showwarning("Selección", "Por favor, seleccione un cliente.")
+            return
+        nombre = self.entry_nombre.get()
+        email = self.entry_email.get()
+
+        if not nombre.strip():
+            messagebox.showwarning("Campo Vacío", "Por favor, ingrese un nombre.")
+            return
+        if not email.strip():
+            messagebox.showwarning("Campo Vacío", "Por favor, ingrese un email.")
+            return 
+        
+        email_viejo = self.treeview_clientes.item(selected_item)["values"][0]
+        nombre = self.entry_nombre.get()
+        if nombre:
+            db = next(get_session())
+            cliente_actualizado = ClienteCRUD.actualizar_cliente(db, email_viejo, nombre,email)
+            if cliente_actualizado:
+                messagebox.showinfo("Éxito", "Cliente actualizado correctamente.")
+                self.cargar_clientes()
+            else:
+                messagebox.showwarning("Error", "No se pudo actualizar el cliente.")
+            db.close()
+        else:
+            messagebox.showwarning("Campos Vacíos", "Por favor, ingrese el nombre.")
+
+    def eliminar_cliente(self):
+        selected_item = self.treeview_clientes.selection()
+        if not selected_item:
+            messagebox.showwarning("Selección", "Por favor, seleccione un cliente.")
+            return
+        email = self.treeview_clientes.item(selected_item)["values"][0]
+        db = next(get_session())
+        ClienteCRUD.borrar_cliente(db, email)
+        messagebox.showinfo("Éxito", "Cliente eliminado correctamente.")
+        self.cargar_clientes()
+        #self.actualizar_emails_combobox()   Actualizar el Combobox después de eliminar
+        db.close()
+
 
     def configurar_pestana2(self):
         # Frame para mostrar las tarjetas de menú
