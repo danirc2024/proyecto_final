@@ -1,83 +1,111 @@
 import customtkinter as ctk
 from tkinter import ttk
 from CTkMessagebox import CTkMessagebox
-from datetime import datetime
+
 
 class PedidosVentana(ctk.CTkFrame):
     def __init__(self, master, lista_pedidos, lista_clientes):
         super().__init__(master)
-        self.lista_pedidos = lista_pedidos
-        self.lista_clientes = lista_clientes
+        self.lista_pedidos = lista_pedidos  # Pedidos realizados
+        self.lista_clientes = lista_clientes  # Clientes registrados
         self.pack(fill="both", expand=True, padx=10, pady=10)
         self.configurar_ventana()
 
     def configurar_ventana(self):
-        # Frame para crear y mostrar pedidos
-        frame_formulario = ctk.CTkFrame(self)
-        frame_formulario.pack(side="left", fill="both", expand=True, padx=10, pady=10)
-
+        # Frame para lista de pedidos
         frame_lista = ctk.CTkFrame(self)
-        frame_lista.pack(side="right", fill="both", expand=True, padx=10, pady=10)
+        frame_lista.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
-        # Formulario de pedidos
-        ctk.CTkLabel(frame_formulario, text="Cliente: ").pack(pady=5)
-        self.combo_cliente = ctk.CTkComboBox(frame_formulario, values=[cliente["nombre"] for cliente in self.lista_clientes])
-        self.combo_cliente.pack(pady=5)
-
-        ctk.CTkLabel(frame_formulario, text="Descripción: ").pack(pady=5)
-        self.entry_descripcion = ctk.CTkEntry(frame_formulario)
-        self.entry_descripcion.pack(pady=5)
-
-        ctk.CTkLabel(frame_formulario, text="Total: ").pack(pady=5)
-        self.entry_total = ctk.CTkEntry(frame_formulario)
-        self.entry_total.pack(pady=5)
-
-        ctk.CTkButton(frame_formulario, text="Crear Pedido", command=self.crear_pedido).pack(pady=10)
-        ctk.CTkButton(frame_formulario, text="Eliminar Pedido", command=self.eliminar_pedido).pack(pady=10)
+        # Frame para detalles del pedido
+        frame_detalle = ctk.CTkFrame(self)
+        frame_detalle.pack(side="right", fill="both", expand=True, padx=10, pady=10)
 
         # Lista de pedidos
-        self.tree = ttk.Treeview(frame_lista, columns=("Cliente", "Descripción", "Total", "Fecha"), show="headings")
-        self.tree.heading("Cliente", text="Cliente")
-        self.tree.heading("Descripción", text="Descripción")
-        self.tree.heading("Total", text="Total")
-        self.tree.heading("Fecha", text="Fecha")
-        self.tree.pack(expand=True, fill="both", padx=10, pady=10)
+        ctk.CTkLabel(frame_lista, text="Pedidos Realizados:").pack(pady=5)
+        self.tree_pedidos = ttk.Treeview(
+            frame_lista, columns=("Cliente", "Fecha", "Total"), show="headings"
+        )
+        self.tree_pedidos.heading("Cliente", text="Cliente")
+        self.tree_pedidos.heading("Fecha", text="Fecha")
+        self.tree_pedidos.heading("Total", text="Total")
+        self.tree_pedidos.pack(expand=True, fill="both", padx=10, pady=10)
 
-    def crear_pedido(self):
-        cliente = self.combo_cliente.get()
-        descripcion = self.entry_descripcion.get()
-        total = self.entry_total.get()
+        # Botón para eliminar pedido
+        ctk.CTkButton(frame_lista, text="Eliminar Pedido", command=self.eliminar_pedido).pack(pady=10)
 
-        if not cliente or not descripcion or not total.isdigit():
-            CTkMessagebox(title="Error", message="Complete todos los campos correctamente.", icon="warning")
-            return
+        # Filtro por cliente
+        ctk.CTkLabel(frame_lista, text="Filtrar por Cliente:").pack(pady=5)
+        self.combo_cliente = ctk.CTkComboBox(
+            frame_lista, values=[cliente["nombre"] for cliente in self.lista_clientes], command=self.filtrar_pedidos
+        )
+        self.combo_cliente.pack(pady=5)
 
-        pedido = {
-            "cliente": cliente,
-            "descripcion": descripcion,
-            "total": int(total),
-            "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        }
+        # Detalle del pedido seleccionado
+        ctk.CTkLabel(frame_detalle, text="Detalle del Pedido:").pack(pady=5)
+        self.tree_detalle = ttk.Treeview(
+            frame_detalle, columns=("Menú", "Cantidad", "Subtotal"), show="headings"
+        )
+        self.tree_detalle.heading("Menú", text="Menú")
+        self.tree_detalle.heading("Cantidad", text="Cantidad")
+        self.tree_detalle.heading("Subtotal", text="Subtotal")
+        self.tree_detalle.pack(expand=True, fill="both", padx=10, pady=10)
 
-        self.lista_pedidos.append(pedido)
-        self.actualizar_lista()
-    
+        # Botón para mostrar detalle
+        ctk.CTkButton(frame_detalle, text="Ver Detalle", command=self.mostrar_detalle).pack(pady=10)
 
-    def actualizar_lista(self):
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+        self.actualizar_treeview()
+
+    def actualizar_treeview(self):
+        # Limpiar Treeview de pedidos
+        for item in self.tree_pedidos.get_children():
+            self.tree_pedidos.delete(item)
+
+        # Agregar los pedidos a la lista
+        for pedido in self.lista_pedidos:
+            self.tree_pedidos.insert("", "end", values=(pedido["cliente"], pedido["fecha"], f"${pedido['total']:.2f}"))
+
+    def filtrar_pedidos(self, cliente):
+        # Filtrar pedidos por cliente seleccionado
+        self.tree_pedidos.delete(*self.tree_pedidos.get_children())
 
         for pedido in self.lista_pedidos:
-            self.tree.insert("", "end", values=(pedido["cliente"], pedido["descripcion"], pedido["total"], pedido["fecha"]))
+            if pedido["cliente"] == cliente:
+                self.tree_pedidos.insert("", "end", values=(pedido["cliente"], pedido["fecha"], f"${pedido['total']:.2f}"))
 
-    def eliminar_pedido(self):
-        seleccion = self.tree.selection()
+    def mostrar_detalle(self):
+        # Obtener el pedido seleccionado
+        seleccion = self.tree_pedidos.selection()
         if not seleccion:
-            CTkMessagebox(title="Error", message="Por favor selecciona un cliente para eliminar.", icon="warning")
+            CTkMessagebox(title="Error", message="Seleccione un pedido para ver los detalles.", icon="warning")
             return
 
-        for item in seleccion:
-            nombre = self.tree.item(item, "values")[0]
-            self.lista_pedidos = [ing for ing in self.lista_pedidos if ing["cliente"] != nombre]
-            self.tree.delete(item)
-        self.actualizar_lista()
+        # Obtener datos del pedido
+        cliente, fecha, total = self.tree_pedidos.item(seleccion[0])["values"]
+        pedido = next((p for p in self.lista_pedidos if p["cliente"] == cliente and p["fecha"] == fecha), None)
+
+        if not pedido:
+            CTkMessagebox(title="Error", message="Pedido no encontrado.", icon="warning")
+            return
+
+        # Mostrar detalle
+        self.tree_detalle.delete(*self.tree_detalle.get_children())
+        for item in pedido["detalle"]:
+            self.tree_detalle.insert(
+                "", "end", values=(item["menu"], item["cantidad"], f"${item['subtotal']:.2f}")
+            )
+
+    def eliminar_pedido(self):
+        # Obtener el pedido seleccionado
+        seleccion = self.tree_pedidos.selection()
+        if not seleccion:
+            CTkMessagebox(title="Error", message="Seleccione un pedido para eliminar.", icon="warning")
+            return
+
+        # Obtener datos del pedido
+        cliente, fecha, total = self.tree_pedidos.item(seleccion[0])["values"]
+        self.lista_pedidos = [
+            p for p in self.lista_pedidos if not (p["cliente"] == cliente and p["fecha"] == fecha)
+        ]
+        self.actualizar_treeview()
+
+        CTkMessagebox(title="Éxito", message="Pedido eliminado correctamente.", icon="info")
