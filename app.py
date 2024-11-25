@@ -30,8 +30,9 @@ class PestañasPrincipal(ctk.CTk):
 
     def crear_pestanas(self):
         self.tab1 = self.tabview.add("Ingreso De Ingredientes")
-        self.tab2 = self.tabview.add("Pedido")
-        # Pestaña de Clientes
+        self.tab2 = self.tabview.add("Menu")
+        self.configurar_pestana_pedidos()
+        # Pestaña de ClienteS
         self.tab_clientes = self.tabview.add("Clientes")
         self.crear_formulario_cliente(self.tab_clientes)
         self.configurar_pestana1()
@@ -426,50 +427,50 @@ class PestañasPrincipal(ctk.CTk):
         pdf.build(elementos)
         CTkMessagebox(title="Boleta Generada", message=f"La boleta se ha generado correctamente como '{nombre_archivo}'.", icon="info")
         
-        def configurar_pestana_pedidos(self):
-            # Crear un Frame para contener la tabla y los botones
-            frame_pedidos = ctk.CTkFrame(self.tabview.add("Pedidos"))
-            frame_pedidos.pack(fill="both", expand=True, padx=10, pady=10)
+    def configurar_pestana_pedidos(self):
+        # Crear un Frame para contener la tabla y los botones
+        frame_pedidos = ctk.CTkFrame(self.tabview.add("Pedidos"))
+        frame_pedidos.pack(fill="both", expand=True, padx=10, pady=10)
 
-            # Treeview para mostrar los pedidos
-            self.treeview_pedidos = ttk.Treeview(frame_pedidos, columns=("ID", "Correo Cliente", "Menú", "Cantidad"), show="headings")
-            self.treeview_pedidos.heading("ID", text="ID Pedido")
-            self.treeview_pedidos.heading("Correo Cliente", text="Correo Cliente")
-            self.treeview_pedidos.heading("Menú", text="Menú")
-            self.treeview_pedidos.heading("Cantidad", text="Cantidad")
-            self.treeview_pedidos.pack(fill="both", expand=True, padx=10, pady=10)
+        # Treeview para mostrar los pedidos
+        self.treeview_pedidos = ttk.Treeview(frame_pedidos, columns=("ID", "Correo Cliente", "Menú", "Cantidad"), show="headings")
+        self.treeview_pedidos.heading("ID", text="ID Pedido")
+        self.treeview_pedidos.heading("Correo Cliente", text="Correo Cliente")
+        self.treeview_pedidos.heading("Menú", text="Menú")
+        self.treeview_pedidos.heading("Cantidad", text="Cantidad")
+        self.treeview_pedidos.pack(fill="both", expand=True, padx=10, pady=10)
 
-            # Botones para gestionar pedidos
-            frame_botones = ctk.CTkFrame(frame_pedidos)
-            frame_botones.pack(fill="x", pady=10)
+        # Botones para gestionar pedidos
+        frame_botones = ctk.CTkFrame(frame_pedidos)
+        frame_botones.pack(fill="x", pady=10)
 
-            ctk.CTkButton(frame_botones, text="Cargar Pedidos", command=self.cargar_pedidos).pack(side="left", padx=5)
-            ctk.CTkButton(frame_botones, text="Eliminar Pedido", command=self.eliminar_pedido).pack(side="left", padx=5)
+        ctk.CTkButton(frame_botones, text="Cargar Pedidos", command=self.cargar_pedidos).pack(side="left", padx=5)
+        ctk.CTkButton(frame_botones, text="Eliminar Pedido", command=self.eliminar_pedido).pack(side="left", padx=5)
 
-        def cargar_pedidos(self):
-            """Carga los pedidos en el Treeview desde la base de datos."""
-            from crud.pedidos_crud import PedidoCRUD
-            db = next(get_session())
-            pedidos = PedidoCRUD.leer_pedidos(db)
-            self.treeview_pedidos.delete(*self.treeview_pedidos.get_children())  # Limpiar el Treeview
-            for pedido in pedidos:
-                self.treeview_pedidos.insert("", "end", values=(pedido.id_pedido, pedido.correo_cliente, pedido.menu, pedido.cantidad))
-            db.close()
+    def cargar_pedidos(self):
+        """Carga los pedidos en el Treeview desde la base de datos."""
+        from crud.pedidos_crud import PedidoCRUD
+        db = next(get_session())
+        pedidos = PedidoCRUD.leer_pedidos(db)
+        self.treeview_pedidos.delete(*self.treeview_pedidos.get_children())  # Limpiar el Treeview
+        for pedido in pedidos:
+            self.treeview_pedidos.insert("", "end", values=(pedido.id_pedido, pedido.correo_cliente, pedido.menu, pedido.cantidad))
+        db.close()
 
-        def eliminar_pedido(self):
-            """Elimina el pedido seleccionado en el Treeview."""
-            from crud.pedidos_crud import PedidoCRUD
-            seleccion = self.treeview_pedidos.selection()
-            if not seleccion:
-                messagebox.showwarning("Selección", "Por favor, seleccione un pedido para eliminar.")
-                return
+    def eliminar_pedido(self):
+        """Elimina el pedido seleccionado en el Treeview."""
+        from crud.pedidos_crud import PedidoCRUD
+        seleccion = self.treeview_pedidos.selection()
+        if not seleccion:
+            messagebox.showwarning("Selección", "Por favor, seleccione un pedido para eliminar.")
+            return
 
-            id_pedido = self.treeview_pedidos.item(seleccion, "values")[0]
-            db = next(get_session())
-            PedidoCRUD.borrar_pedido(db, id_pedido)
-            messagebox.showinfo("Éxito", "Pedido eliminado correctamente.")
-            self.cargar_pedidos()
-            db.close()
+        id_pedido = self.treeview_pedidos.item(seleccion, "values")[0]
+        db = next(get_session())
+        PedidoCRUD.borrar_pedido(db, id_pedido)
+        messagebox.showinfo("Éxito", "Pedido eliminado correctamente.")
+        self.cargar_pedidos()
+        db.close()
 
 class Ingreso_Ingredientes:
     def __init__(self, nombre_ingrediente, cantidad):
