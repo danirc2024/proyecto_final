@@ -51,3 +51,16 @@ class IngredienteCRUD:
             db.commit()
             return ingrediente
         return None
+    @staticmethod
+    def reducir_cantidad(db: Session, nombre: str, cantidad: int):
+        """Reduce la cantidad disponible de un ingrediente en la base de datos."""
+        ingrediente = db.query(Ingrediente).filter_by(Nombre=nombre).first()
+        if ingrediente:
+            if ingrediente.Cantidad >= cantidad:
+                ingrediente.Cantidad -= cantidad
+                db.commit()
+                db.refresh(ingrediente)
+                return ingrediente
+            else:
+                raise ValueError(f"No hay suficiente cantidad del ingrediente: {nombre}")
+        return None

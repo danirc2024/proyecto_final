@@ -42,7 +42,7 @@ class PestañasPrincipal(ctk.CTk):
         self.configurar_pestana_menus()
         self.configurar_pestana_panel_compra()
         self.cargar_ingredientes()
-        self.configurar_pestana_graficos()
+        #self.configurar_pestana_graficos()
 
     def configurar_pestana1(self):
         # Frame para ingresar ingredientes
@@ -120,8 +120,9 @@ class PestañasPrincipal(ctk.CTk):
         self.entry_cantidad_ingrediente = ctk.CTkEntry(frame_formulario, placeholder_text="Cantidad requerida")
         self.entry_cantidad_ingrediente.grid(row=2, column=3, padx=10, pady=5)
 
-        # Botón para añadir ingredientes al menú
+
         ctk.CTkButton(frame_formulario, text="Añadir Ingrediente", command=self.agregar_ingrediente_menu).grid(row=2, column=4, padx=10, pady=5)
+
 
         # Frame para mostrar los ingredientes añadidos
         self.tree_ingredientes_menu = ttk.Treeview(self.tab_menus, columns=("Ingrediente", "Cantidad"), show="headings")
@@ -135,6 +136,7 @@ class PestañasPrincipal(ctk.CTk):
 
         ctk.CTkButton(frame_botones, text="Crear Menú", command=self.crear_menu).pack(side="left", padx=5)
         ctk.CTkButton(frame_botones, text="Eliminar Menú", command=self.eliminar_menu).pack(side="left", padx=5)
+        ctk.CTkButton(frame_botones, text="Eliminar Ingrediente", command=self.eliminar_ingrediente_menu).pack(side="left", padx=5)
 
         # Treeview para mostrar menús existentes
         self.tree_menus = ttk.Treeview(self.tab_menus, columns=("ID", "Nombre", "Descripción", "Precio"), show="headings")
@@ -166,6 +168,49 @@ class PestañasPrincipal(ctk.CTk):
             return False
 
         return True
+
+    def eliminar_ingrediente_menu(self):
+        """Elimina un ingrediente del Treeview y de la base de datos."""
+        seleccion = self.tree_ingredientes_menu.selection()
+        
+        if not seleccion:
+            CTkMessagebox(title="Error", message="Por favor, selecciona un ingrediente para eliminar.", icon="warning")
+            return
+
+        valores = self.tree_ingredientes_menu.item(seleccion[0], "values")
+        ingrediente_nombre = valores[0]
+
+        self.tree_ingredientes_menu.delete(seleccion[0])
+
+        db = next(get_session())
+        menu_seleccionado = self.combobox_menus.get()
+        menu = MenuCRUD.leer_menu_por_nombre(db, menu_seleccionado)
+        
+        if not menu:
+            db.close()
+            CTkMessagebox(title="Error", message="no se elimino de ningun menu :D", icon="warning")
+            return
+        
+        ingredientes_actualizados = [ingrediente for ingrediente in menu.Ingredientes if ingrediente["nombre"] != ingrediente_nombre]
+        
+        menu.Ingredientes = ingredientes_actualizados
+        db.commit()
+        db.close()
+
+        CTkMessagebox(title="Éxito", message=f"Ingrediente '{ingrediente_nombre}' eliminado correctamente.")
+        self.actualizar_ingredientes_menu()
+        
+    def actualizar_ingredientes_menu(self):
+        """Recarga los ingredientes del menú en el Treeview."""
+        menu_seleccionado = self.combobox_menus.get()
+        db = next(get_session())
+        menu = MenuCRUD.leer_menu_por_nombre(db, menu_seleccionado)
+        db.close()
+
+        self.tree_ingredientes_menu.delete(*self.tree_ingredientes_menu.get_children()) 
+
+        for ingrediente in menu.Ingredientes:
+            self.tree_ingredientes_menu.insert("", "end", values=(ingrediente["nombre"], ingrediente["cantidad"]))
 
 
 
@@ -578,25 +623,51 @@ class PestañasPrincipal(ctk.CTk):
 
 
     def registrar_pedido(self):
+        """Registra un pedido con el cliente, menú, cantidad y total, y descuenta los ingredientes necesarios."""
         cliente = self.combobox_clientes.get()
-        menu = self.combobox_menus.get()
+        menu_seleccionado = self.combobox_menus.get()
         cantidad = self.entry_cantidad.get()
         total_text = self.label_total.cget("text").replace("Total: $", "")
 
-        if not cliente or not menu or not cantidad.isdigit() or float(total_text) <= 0:
+        if not cliente or not menu_seleccionado or not cantidad.isdigit() or float(total_text) <= 0:
             CTkMessagebox(title="Error", message="Completa todos los campos correctamente.", icon="warning")
             return
 
+        cantidad = int(cantidad)
         db = next(get_session())
-        pedido = PedidoCRUD.crear_pedido(db, cliente, menu, int(cantidad), float(total_text))
-        db.close()
+        try:
+            # Obtener el menú seleccionado utilizando el CRUD
+            menu = MenuCRUD.leer_menu_por_nombre(db, menu_seleccionado)
+            if not menu:
+                raise ValueError(f"No se encontró el menú: {menu_seleccionado}")
 
-        if pedido:
-            CTkMessagebox(title="Éxito", message="Pedido registrado correctamente.")
-            self.cargar_pedidos()
-        else:
-            CTkMessagebox(title="Error", message="No se pudo registrar el pedido.")
+            # Verificar y descontar ingredientes
+            for ingrediente in menu.Ingredientes:  # Iteramos sobre la lista de ingredientes
+                ingrediente_nombre = ingrediente["nombre"]
+                ingrediente_cantidad = ingrediente["cantidad"] * cantidad  # Multiplicamos por la cantidad del menú
+                IngredienteCRUD.reducir_cantidad(db, ingrediente_nombre, ingrediente_cantidad)
+
+            # Registrar el pedido
+            pedido = PedidoCRUD.crear_pedido(db, cliente, menu_seleccionado, cantidad, float(total_text))
+            db.commit()
+
+            if pedido:
+                CTkMessagebox(title="Éxito", message="Pedido registrado correctamente y los ingredientes fueron descontados.")
+                self.cargar_pedidos()
+            else:
+                CTkMessagebox(title="Error", message="No se pudo registrar el pedido.")
+        except ValueError as e:
+            db.rollback()
+            CTkMessagebox(title="Error", message=f"Error al procesar el pedido: {e}", icon="warning")
+        except Exception as e:
+            db.rollback()
+            CTkMessagebox(title="Error", message=f"Ocurrió un error inesperado: {e}", icon="warning")
+        finally:
+            db.close()
+            
         self.cargar_pedidotes()
+        self.cargar_ingredientes()
+
             
     def cargar_clientesotes(self):
         db = next(get_session())
