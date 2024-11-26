@@ -182,6 +182,7 @@ class PestañasPrincipal(ctk.CTk):
 
         if ingrediente:
             self.cargar_ingredientes()
+            self.actualizar_combobox_ingredientes()
             CTkMessagebox(title="Éxito", message="Ingrediente agregado correctamente.")
         else:
             CTkMessagebox(title="Error", message="No se pudo agregar el ingrediente.")
@@ -207,6 +208,7 @@ class PestañasPrincipal(ctk.CTk):
 
         if menu:
             CTkMessagebox(title="Éxito", message="Menú creado correctamente.")
+            self.actualizar_combobox_menus()
             self.cargar_menus()  # Actualizar la vista
         else:
             CTkMessagebox(title="Error", message="No se pudo crear el menú. Verifica los ingredientes disponibles.")
@@ -333,6 +335,7 @@ class PestañasPrincipal(ctk.CTk):
             cliente = ClienteCRUD.crear_cliente(db, nombre, email)
             if cliente:
                 messagebox.showinfo("Éxito", "Cliente creado correctamente.")
+                self.actualizar_combobox_clientes()
                 self.cargar_clientes()
                 #self.actualizar_emails_combobox()   Actualizar el Combobox con el nuevo email
             else:
@@ -444,7 +447,7 @@ class PestañasPrincipal(ctk.CTk):
             return
 
         db = next(get_session())
-        menu = MenuCRUD.leer_menu_por_nombre(db, menu_selecciona)
+        menu = MenuCRUD.leer_menu_por_nombre(db, menu_seleccionado)
         db.close()
 
         if menu:
@@ -456,62 +459,6 @@ class PestañasPrincipal(ctk.CTk):
 
 
     #utiliza el ReportLab para generar la boleta, si no lo tienen es una extencion [ pip install ReportLab ]
-    def generar_boleta(self):
-        if not self.menu:
-            CTkMessagebox(title="Error", message="No hay elementos en el pedido para generar una boleta.", icon="warning")
-            return
-
-        total_precio = sum(menu_item.precio * menu_item.cantidad for menu_item in self.menu)
-        # Crear el documento PDF
-        nombre_archivo = "boleta.pdf"
-        pdf = SimpleDocTemplate(nombre_archivo, pagesize=A4)
-        elementos = []
-        estilos = getSampleStyleSheet()
-        
-        # Título de la boleta
-        titulo = Paragraph("Boleta de Pedido", estilos['Title'])
-        elementos.append(titulo)
-        elementos.append(Spacer(1, 12))  # Espacio después del título
-
-        # Fecha de la boleta
-        fecha = Paragraph(f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", estilos['Normal'])
-        elementos.append(fecha)
-        elementos.append(Spacer(1, 12))  # Espacio después de la fecha
-
-        # Tabla de contenido del pedido
-        datos = [["Nombre del Menú", "Cantidad", "Precio Unitario", "Total"]]
-        total_menu = 0
-        
-        for item in self.menu:
-            nombre = item.nombre  # Acceder al atributo 'nombre' del objeto item
-            cantidad = item.cantidad  # Acceder al atributo 'cantidad' del objeto item
-            precio = item.precio  # Acceder al atributo 'precio' del objeto item
-            total = precio * cantidad
-            datos.append([nombre, cantidad, f"${precio:.2f}", f"${total:.2f}"])
-            total_menu += total
-
-        # Agregar fila con el total final
-        datos.append(["", "", "Total", f"${total_menu:.2f}"])
-
-        # Crear la tabla en ReportLab
-        tabla = Table(datos)
-        tabla.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ]))
-
-        elementos.append(tabla)
-        elementos.append(Spacer(1, 12))  # Espacio después de la tabla
-
-        # Generar el PDF
-        pdf.build(elementos)
-        CTkMessagebox(title="Boleta Generada", message=f"La boleta se ha generado correctamente como '{nombre_archivo}'.", icon="info")
         
     def configurar_pestana_pedidos(self):
         # Crear un Frame para contener la tabla y los botones
@@ -534,6 +481,7 @@ class PestañasPrincipal(ctk.CTk):
 
         ctk.CTkButton(frame_botones, text="Cargar Pedidos", command=self.cargar_pedidos).pack(side="left", padx=5)
         ctk.CTkButton(frame_botones, text="Eliminar Pedido", command=self.eliminar_pedido).pack(side="left", padx=5)
+        self.cargar_pedidos()
 
     def cargar_pedidos(self):
         """Carga los pedidos en el Treeview desde la base de datos."""
@@ -608,6 +556,8 @@ class PestañasPrincipal(ctk.CTk):
 
         # Botón para registrar el pedido
         ctk.CTkButton(self.tab_panel_compra, text="Registrar Pedido", command=self.registrar_pedido).pack(pady=10)
+        ctk.CTkButton(self.tab_panel_compra, text="Generar Boleta", command=self.generar_boleta).pack(pady=10)
+
 
         # Treeview para mostrar pedidos
         self.tree_pedidos = ttk.Treeview(self.tab_panel_compra, columns=("ID", "Cliente", "Menú", "Cantidad", "Total", "Fecha"), show="headings")
@@ -645,6 +595,7 @@ class PestañasPrincipal(ctk.CTk):
             self.cargar_pedidos()
         else:
             CTkMessagebox(title="Error", message="No se pudo registrar el pedido.")
+        self.cargar_pedidotes()
             
     def cargar_clientesotes(self):
         db = next(get_session())
@@ -666,8 +617,87 @@ class PestañasPrincipal(ctk.CTk):
 
         for pedido in pedidos:
             self.tree_pedidos.insert("", "end", values=(pedido.ID_pedido, pedido.Correo_cliente, pedido.Menu, pedido.Cantidad, f"${pedido.Total:.2f}", pedido.Fecha.strftime("%Y-%m-%d %H:%M:%S")))
+ 
+    def actualizar_combobox_ingredientes(self):
+        """Recarga los ingredientes disponibles en el Combobox."""
+        db = next(get_session())
+        ingredientes = IngredienteCRUD.leer_ingredientes(db)
+        db.close()
+
+        self.combobox_ingredientes["values"] = [ingrediente.Nombre for ingrediente in ingredientes]
+
+ 
+    def actualizar_combobox_menus(self):
+        """Recarga los menús disponibles en el Combobox."""
+        db = next(get_session())
+        menus = MenuCRUD.leer_menus(db)
+        db.close()
+        self.combobox_menus["values"] = [menu.Nombre for menu in menus]
+    
+    def actualizar_combobox_clientes(self):
+        db = next(get_session())
+        clientes = ClienteCRUD.leer_clientes(db)
+        db.close()
+
+        self.combobox_clientes["values"] = [cliente.email for cliente in clientes]
+        
+    def generar_boleta(self):
+        """Genera una boleta en PDF para el pedido seleccionado en el Treeview."""
+        # Obtener el pedido seleccionado
+        seleccion = self.tree_pedidos.selection()
+        if not seleccion:
+            CTkMessagebox(title="Error", message="Por favor, selecciona un pedido para generar la boleta.", icon="warning")
+            return
+        valores = self.treeview_pedidos.item(seleccion[0], "values")  # Cambiar a [0]
+        ID, correo_cliente, menu, cantidad, total, fecha = valores
 
 
+        # Crear el documento PDF
+        nombre_archivo = "boleta.pdf"
+        pdf = SimpleDocTemplate(nombre_archivo, pagesize=A4)
+        elementos = []
+        estilos = getSampleStyleSheet()
+
+        # Título de la boleta
+        titulo = Paragraph("Boleta de Pedido", estilos['Title'])
+        elementos.append(titulo)
+        elementos.append(Spacer(1, 12))  # Espacio después del título
+
+        # Información del cliente y la fecha
+        info_cliente = Paragraph(f"Cliente: {correo_cliente}", estilos['Normal'])
+        elementos.append(info_cliente)
+        elementos.append(Spacer(1, 12))  # Espacio después del cliente
+
+        fecha_pedido = Paragraph(f"Fecha: {fecha}", estilos['Normal'])
+        elementos.append(fecha_pedido)
+        elementos.append(Spacer(1, 12))  # Espacio después de la fecha
+
+        # Tabla del pedido
+        datos = [["Menú", "Cantidad", "Precio Unitario", "Total"]]
+        precio_unitario = float(total.strip('$')) / int(cantidad)  # Convertir texto de total a float
+        datos.append([menu, cantidad, f"${precio_unitario:.2f}", total])
+
+        tabla = Table(datos)
+        tabla.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ]))
+
+        elementos.append(tabla)
+        elementos.append(Spacer(1, 12))  # Espacio después de la tabla
+
+        # Generar el PDF
+        pdf.build(elementos)
+        CTkMessagebox(title="Boleta Generada", message=f"La boleta se ha generado correctamente como '{nombre_archivo}'.", icon="info")
+
+
+    
 class Ingreso_Ingredientes:
     def __init__(self, nombre_ingrediente, cantidad):
         self.nombre = nombre_ingrediente
