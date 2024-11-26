@@ -52,6 +52,10 @@ class PestañasPrincipal(ctk.CTk):
         frame_treeview.pack(side="right", fill="both", expand=True, padx=10, pady=10)
 
         # Formulario de ingredientes
+        ctk.CTkLabel(Window1, text="Tipo de Ingrediente: ").pack(pady=5)
+        self.combobox_tipo_ingrediente = ttk.Combobox(Window1, state="readonly")
+        self.combobox_tipo_ingrediente["values"] = ["masa", "bebestible", "vegetal", "carne"]
+        self.combobox_tipo_ingrediente.pack(pady=5)
         
         label_nombre_ingred = ctk.CTkLabel(Window1, text="Nombre Ingrediente: ")
         label_nombre_ingred.pack(pady=5)
@@ -72,11 +76,13 @@ class PestañasPrincipal(ctk.CTk):
         self.boton_eliminar.pack(pady=10)
 
         # Treeview para mostrar los ingredientes ingresados
-        self.tree = ttk.Treeview(frame_treeview, columns=("ID","Nombre", "Cantidad"), show="headings")
-        self.tree.heading("ID", text="ID")
-        self.tree.heading("Nombre", text="Nombre Ingrediente")
+        self.tree = ttk.Treeview(frame_treeview, columns=("ID", "Nombre", "Cantidad", "Tipo"), show="headings")
+        self.tree.heading("ID", text="ID Ingrediente")
+        self.tree.heading("Nombre", text="Nombre")
         self.tree.heading("Cantidad", text="Cantidad")
+        self.tree.heading("Tipo", text="Tipo")
         self.tree.pack(expand=True, fill="both", padx=10, pady=10)
+
 
         # Botón para generar menú
 
@@ -141,14 +147,15 @@ class PestañasPrincipal(ctk.CTk):
         self.cargar_ingredientes_disponibles()
         self.cargar_menus()
 
-        
-    def validar_Ingrediente(self, nombre, cantidad):
-        # Validar que el nombre contenga solo letras y que la cantidad sea un número positivo
+    def validar_Ingrediente(self, nombre, cantidad, tipo):
         if not re.match(r"^[a-zA-Z\s]+$", nombre):
             CTkMessagebox(title="Error de Validación", message="El nombre del ingrediente debe contener solo letras y espacios.", icon="warning")
             return False
         if not cantidad.isdigit() or int(cantidad) <= 0:
             CTkMessagebox(title="Error de Validación", message="La cantidad debe contener solo números enteros positivos.", icon="warning")
+            return False
+        if tipo not in ["masa", "bebestible", "vegetal", "carne"]:
+            CTkMessagebox(title="Error de Validación", message="Seleccione un tipo válido de ingrediente.", icon="warning")
             return False
 
         # Validar cantidad contra el stock
@@ -164,12 +171,13 @@ class PestañasPrincipal(ctk.CTk):
     def ingresar_Ingrediente(self):
         nombre = self.entry_nombre_ingred.get()
         cantidad = self.entry_cantidad_ingred.get()
+        tipo = self.combobox_tipo_ingrediente.get()
 
-        if not self.validar_Ingrediente(nombre, cantidad):
+        if not self.validar_Ingrediente(nombre, cantidad, tipo):
             return
 
         db = next(get_session())
-        ingrediente = IngredienteCRUD.agregar_ingrediente(db, nombre, int(cantidad))
+        ingrediente = IngredienteCRUD.agregar_ingrediente(db, nombre, int(cantidad), tipo)
         db.close()
 
         if ingrediente:
@@ -215,7 +223,7 @@ class PestañasPrincipal(ctk.CTk):
 
         # Insertar ingredientes en el Treeview
         for ingrediente in ingredientes:
-            self.tree.insert("", "end", values=(ingrediente.ID_ingrediente, ingrediente.Nombre, ingrediente.Cantidad))
+            self.tree.insert("", "end", values=(ingrediente.ID_ingrediente, ingrediente.Nombre, ingrediente.Cantidad, ingrediente.Tipo))
 
     def eliminar_ingrediente(self):
         """Elimina el ingrediente seleccionado en el Treeview."""
@@ -436,7 +444,7 @@ class PestañasPrincipal(ctk.CTk):
             return
 
         db = next(get_session())
-        menu = MenuCRUD.leer_menu_por_nombre(db, menu_seleccionado)
+        menu = MenuCRUD.leer_menu_por_nombre(db, menu_selecciona)
         db.close()
 
         if menu:
@@ -511,11 +519,13 @@ class PestañasPrincipal(ctk.CTk):
         frame_pedidos.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Treeview para mostrar los pedidos
-        self.treeview_pedidos = ttk.Treeview(frame_pedidos, columns=("ID", "Correo Cliente", "Menú", "Cantidad"), show="headings")
+        self.treeview_pedidos = ttk.Treeview(frame_pedidos, columns=("ID", "Correo Cliente", "Menú", "Cantidad", "Total", "Fecha"), show="headings")
         self.treeview_pedidos.heading("ID", text="ID Pedido")
         self.treeview_pedidos.heading("Correo Cliente", text="Correo Cliente")
         self.treeview_pedidos.heading("Menú", text="Menú")
         self.treeview_pedidos.heading("Cantidad", text="Cantidad")
+        self.treeview_pedidos.heading("Total", text="Total")
+        self.treeview_pedidos.heading("Fecha", text="Fecha")
         self.treeview_pedidos.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Botones para gestionar pedidos
@@ -527,28 +537,41 @@ class PestañasPrincipal(ctk.CTk):
 
     def cargar_pedidos(self):
         """Carga los pedidos en el Treeview desde la base de datos."""
-        from crud.pedidos_crud import PedidoCRUD
         db = next(get_session())
         pedidos = PedidoCRUD.leer_pedidos(db)
-        self.treeview_pedidos.delete(*self.treeview_pedidos.get_children())  # Limpiar el Treeview
-        for pedido in pedidos:
-            self.treeview_pedidos.insert("", "end", values=(pedido.id_pedido, pedido.correo_cliente, pedido.menu, pedido.cantidad))
         db.close()
+
+        self.treeview_pedidos.delete(*self.treeview_pedidos.get_children())  # Limpiar el Treeview
+
+        for pedido in pedidos:
+            self.treeview_pedidos.insert("", "end", values=(
+                pedido.ID_pedido,
+                pedido.Correo_cliente,
+                pedido.Menu,
+                pedido.Cantidad,
+                f"${pedido.Total:.2f}",
+                pedido.Fecha.strftime("%d-%m-%y %H:%M:%S")
+            ))
+
 
     def eliminar_pedido(self):
         """Elimina el pedido seleccionado en el Treeview."""
-        from crud.pedidos_crud import PedidoCRUD
         seleccion = self.treeview_pedidos.selection()
         if not seleccion:
-            messagebox.showwarning("Selección", "Por favor, seleccione un pedido para eliminar.")
+            CTkMessagebox(title="Error", message="Por favor, selecciona un pedido para eliminar.", icon="warning")
             return
 
-        id_pedido = self.treeview_pedidos.item(seleccion, "values")[0]
+        id_pedido = self.treeview_pedidos.item(seleccion[0], "values")[0]
         db = next(get_session())
-        PedidoCRUD.borrar_pedido(db, id_pedido)
-        messagebox.showinfo("Éxito", "Pedido eliminado correctamente.")
-        self.cargar_pedidos()
+        pedido_eliminado = PedidoCRUD.borrar_pedido(db, id_pedido)
         db.close()
+
+        if pedido_eliminado:
+            CTkMessagebox(title="Éxito", message="Pedido eliminado correctamente.")
+            self.cargar_pedidos()  # Recargar el Treeview
+        else:
+            CTkMessagebox(title="Error", message="No se pudo eliminar el pedido.")
+
         
     
     def configurar_pestana_panel_compra(self):
@@ -599,7 +622,7 @@ class PestañasPrincipal(ctk.CTk):
         # Cargar datos iniciales
         self.cargar_clientesotes()
         self.cargar_menusotes()
-        self.cargar_pedidos()
+        self.cargar_pedidotes()
     
 
 
@@ -635,7 +658,7 @@ class PestañasPrincipal(ctk.CTk):
         db.close()
         self.combobox_menus["values"] = [menu.Nombre for menu in menus]
 
-    def cargar_pedidos(self):
+    def cargar_pedidotes(self):
         db = next(get_session())
         pedidos = PedidoCRUD.leer_pedidos(db)
         db.close()

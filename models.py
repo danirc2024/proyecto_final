@@ -32,6 +32,7 @@ class Ingrediente(Base):
     ID_ingrediente = Column(Integer, primary_key=True, autoincrement=True)
     Nombre = Column(String, unique=True, nullable=False)
     Cantidad = Column(Integer, nullable=False)
+    Tipo = Column(String, nullable=False)
 
 
 class Menu(Base):

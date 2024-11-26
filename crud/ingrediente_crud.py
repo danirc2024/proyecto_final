@@ -4,7 +4,7 @@ from models import Ingrediente
 
 class IngredienteCRUD:
     @staticmethod
-    def agregar_ingrediente(db: Session, nombre: str, cantidad: int):
+    def agregar_ingrediente(db: Session, nombre: str, cantidad: int, tipo: str):
         """Agrega un ingrediente o incrementa la cantidad si ya existe."""
         try:
             # Buscar si el ingrediente ya existe
@@ -14,7 +14,7 @@ class IngredienteCRUD:
                 ingrediente.Cantidad += cantidad
             else:
                 # Si no existe, crear un nuevo registro
-                ingrediente = Ingrediente(Nombre=nombre, Cantidad=cantidad)
+                ingrediente = Ingrediente(Nombre=nombre, Cantidad=cantidad, Tipo=tipo)
                 db.add(ingrediente)
 
             db.commit()
@@ -30,11 +30,13 @@ class IngredienteCRUD:
         return db.query(Ingrediente).all()
 
     @staticmethod
-    def actualizar_ingrediente(db: Session, id_ingrediente: int, nueva_cantidad: int):
-        """Actualiza la cantidad de un ingrediente existente."""
+    def actualizar_ingrediente(db: Session, id_ingrediente: int, nueva_cantidad: int, nuevo_tipo: str = None):
+        """Actualiza la cantidad y opcionalmente el tipo de un ingrediente existente."""
         ingrediente = db.query(Ingrediente).get(id_ingrediente)
         if ingrediente:
             ingrediente.Cantidad = nueva_cantidad
+            if nuevo_tipo:
+                ingrediente.Tipo = nuevo_tipo
             db.commit()
             db.refresh(ingrediente)
             return ingrediente
