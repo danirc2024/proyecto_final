@@ -8,6 +8,9 @@ from datetime import datetime
 import re
 from crud.cliente_crud import ClienteCRUD
 from database import get_session, engine, Base
+from crud.ingrediente_crud import IngredienteCRUD
+from crud.pedidos_crud import PedidoCRUD
+from crud.menu_crud import MenuCRUD
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -27,16 +30,18 @@ class PestañasPrincipal(ctk.CTk):
         self.pedido = []  # Lista para almacenar el pedido actual
 
         self.crear_pestanas()
+        
 
     def crear_pestanas(self):
         self.tab1 = self.tabview.add("Ingreso De Ingredientes")
-        self.tab2 = self.tabview.add("Menu")
         self.configurar_pestana_pedidos()
         # Pestaña de ClienteS
         self.tab_clientes = self.tabview.add("Clientes")
         self.crear_formulario_cliente(self.tab_clientes)
         self.configurar_pestana1()
-        self.configurar_pestana2()
+        self.configurar_pestana_menus()
+        self.configurar_pestana_panel_compra()
+        self.cargar_ingredientes()
 
     def configurar_pestana1(self):
         # Frame para ingresar ingredientes
@@ -47,6 +52,7 @@ class PestañasPrincipal(ctk.CTk):
         frame_treeview.pack(side="right", fill="both", expand=True, padx=10, pady=10)
 
         # Formulario de ingredientes
+        
         label_nombre_ingred = ctk.CTkLabel(Window1, text="Nombre Ingrediente: ")
         label_nombre_ingred.pack(pady=5)
         self.entry_nombre_ingred = ctk.CTkEntry(Window1)
@@ -62,19 +68,80 @@ class PestañasPrincipal(ctk.CTk):
         self.boton_ingresar.pack(pady=10)
 
         # Botón para eliminar ingrediente
-        self.boton_eliminar = ctk.CTkButton(frame_treeview, text="Eliminar Ingrediente", fg_color="black", text_color="white", command=self.eliminar_Ingrediente)
+        self.boton_eliminar = ctk.CTkButton(frame_treeview, text="Eliminar Ingrediente", fg_color="black", text_color="white", command=self.eliminar_ingrediente)
         self.boton_eliminar.pack(pady=10)
 
         # Treeview para mostrar los ingredientes ingresados
-        self.tree = ttk.Treeview(frame_treeview, columns=("Nombre", "Cantidad"), show="headings")
+        self.tree = ttk.Treeview(frame_treeview, columns=("ID","Nombre", "Cantidad"), show="headings")
+        self.tree.heading("ID", text="ID")
         self.tree.heading("Nombre", text="Nombre Ingrediente")
         self.tree.heading("Cantidad", text="Cantidad")
         self.tree.pack(expand=True, fill="both", padx=10, pady=10)
 
         # Botón para generar menú
-        self.boton_generar_menu = ctk.CTkButton(Window1, text="Generar Menú", command=self.generar_menu)
-        self.boton_generar_menu.pack(side="bottom", pady=10)
 
+    def configurar_pestana_menus(self):
+        """Configura la pestaña de gestión de menús."""
+        # Frame principal de la pestaña
+        self.tab_menus = ctk.CTkFrame(self.tabview.add("Menús"))
+        self.tab_menus.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Frame superior para el formulario de creación
+        frame_formulario = ctk.CTkFrame(self.tab_menus)
+        frame_formulario.pack(fill="x", padx=10, pady=10)
+
+        # Nombre del menú
+        ctk.CTkLabel(frame_formulario, text="Nombre del Menú").grid(row=0, column=0, padx=10, pady=5)
+        self.entry_menu_nombre = ctk.CTkEntry(frame_formulario, placeholder_text="Ingrese el nombre del menú")
+        self.entry_menu_nombre.grid(row=0, column=1, padx=10, pady=5)
+
+        # Descripción del menú
+        ctk.CTkLabel(frame_formulario, text="Descripción").grid(row=1, column=0, padx=10, pady=5)
+        self.entry_menu_descripcion = ctk.CTkEntry(frame_formulario, placeholder_text="Ingrese una descripción")
+        self.entry_menu_descripcion.grid(row=1, column=1, padx=10, pady=5)
+        
+        ctk.CTkLabel(frame_formulario, text="Precio").grid(row=3, column=0, padx=10, pady=5)
+        self.entry_menu_precio = ctk.CTkEntry(frame_formulario, placeholder_text="Ingrese el precio del menú")
+        self.entry_menu_precio.grid(row=3, column=1, padx=10, pady=5)
+
+        # Selección de ingredientes
+        ctk.CTkLabel(frame_formulario, text="Ingredientes Disponibles").grid(row=2, column=0, padx=10, pady=5)
+        self.combobox_ingredientes = ttk.Combobox(frame_formulario, state="readonly")
+        self.combobox_ingredientes.grid(row=2, column=1, padx=10, pady=5)
+
+        ctk.CTkLabel(frame_formulario, text="Cantidad").grid(row=2, column=2, padx=10, pady=5)
+        self.entry_cantidad_ingrediente = ctk.CTkEntry(frame_formulario, placeholder_text="Cantidad requerida")
+        self.entry_cantidad_ingrediente.grid(row=2, column=3, padx=10, pady=5)
+
+        # Botón para añadir ingredientes al menú
+        ctk.CTkButton(frame_formulario, text="Añadir Ingrediente", command=self.agregar_ingrediente_menu).grid(row=2, column=4, padx=10, pady=5)
+
+        # Frame para mostrar los ingredientes añadidos
+        self.tree_ingredientes_menu = ttk.Treeview(self.tab_menus, columns=("Ingrediente", "Cantidad"), show="headings")
+        self.tree_ingredientes_menu.heading("Ingrediente", text="Ingrediente")
+        self.tree_ingredientes_menu.heading("Cantidad", text="Cantidad")
+        self.tree_ingredientes_menu.pack(fill="both", padx=10, pady=10)
+
+        # Botones para crear y eliminar menús
+        frame_botones = ctk.CTkFrame(self.tab_menus)
+        frame_botones.pack(fill="x", padx=10, pady=10)
+
+        ctk.CTkButton(frame_botones, text="Crear Menú", command=self.crear_menu).pack(side="left", padx=5)
+        ctk.CTkButton(frame_botones, text="Eliminar Menú", command=self.eliminar_menu).pack(side="left", padx=5)
+
+        # Treeview para mostrar menús existentes
+        self.tree_menus = ttk.Treeview(self.tab_menus, columns=("ID", "Nombre", "Descripción", "Precio"), show="headings")
+        self.tree_menus.heading("ID", text="ID Menú")
+        self.tree_menus.heading("Nombre", text="Nombre")
+        self.tree_menus.heading("Descripción", text="Descripción")
+        self.tree_menus.heading("Precio", text="Precio")
+        self.tree_menus.pack(fill="both", padx=10, pady=10)
+
+        # Cargar ingredientes disponibles y menús existentes al iniciar
+        self.cargar_ingredientes_disponibles()
+        self.cargar_menus()
+
+        
     def validar_Ingrediente(self, nombre, cantidad):
         # Validar que el nombre contenga solo letras y que la cantidad sea un número positivo
         if not re.match(r"^[a-zA-Z\s]+$", nombre):
@@ -93,6 +160,7 @@ class PestañasPrincipal(ctk.CTk):
         return True
 
 
+
     def ingresar_Ingrediente(self):
         nombre = self.entry_nombre_ingred.get()
         cantidad = self.entry_cantidad_ingred.get()
@@ -100,69 +168,101 @@ class PestañasPrincipal(ctk.CTk):
         if not self.validar_Ingrediente(nombre, cantidad):
             return
 
-        nuevo_ingrediente = Ingreso_Ingredientes(nombre, int(cantidad))
+        db = next(get_session())
+        ingrediente = IngredienteCRUD.agregar_ingrediente(db, nombre, int(cantidad))
+        db.close()
 
-        # Buscar si el ingrediente ya existe en la lista
-        for ing in self.lista_Ingredientes:
-            if ing.nombre == nombre:
-                ing.cantidad += nuevo_ingrediente.cantidad
-                self.actualizar_treeview()
-                return
-
-        self.lista_Ingredientes.append(nuevo_ingrediente)
-        self.actualizar_treeview()
-
-    def generar_menu(self):
-    # Definir los menús disponibles
-        menu1 = MenuItem("Papas Fritas", [Ingreso_Ingredientes("papas", 5)], "icono_papas_fritas_64x64.png", 500)
-        menu2 = MenuItem("Pepsi", [Ingreso_Ingredientes("bebida", 1)], "icono_cola_64x64.png", 1100)
-        menu3 = MenuItem("Completo", [Ingreso_Ingredientes("vianesa", 1), Ingreso_Ingredientes("pan de completo", 1), Ingreso_Ingredientes("tomate", 1), Ingreso_Ingredientes("palta", 1)], "icono_hot_dog_sin_texto_64x64.png", 1800)
-        menu4 = MenuItem("Hamburguesa", [Ingreso_Ingredientes("pan de hamburguesa", 1), Ingreso_Ingredientes("lamina de queso", 1), Ingreso_Ingredientes("churrasco de carne", 1)], "icono_hamburguesa_negra_64x64.png", 3500)
-
-        menus_disponibles = []
-        for menu_item in [menu1, menu2, menu3, menu4]:
-            ingredientes_faltantes = []
-            for ingrediente in menu_item.ingredientes:
-                ingrediente_en_stock = next((item for item in self.lista_Ingredientes if item.nombre == ingrediente.nombre), None)
-                if not ingrediente_en_stock or ingrediente_en_stock.cantidad < ingrediente.cantidad:
-                    ingredientes_faltantes.append(ingrediente.nombre)
-
-            if not ingredientes_faltantes:
-                menus_disponibles.append(menu_item)
-            else:
-                mensaje_faltantes = ', '.join(ingredientes_faltantes)
-                CTkMessagebox(title="Ingredientes Faltantes", message=f"Faltan los siguientes ingredientes para '{menu_item.nombre}': {mensaje_faltantes}", icon="warning")
-
-        if menus_disponibles:
-            # Limpiar las tarjetas existentes
-            for widget in self.tarjetas_frame.winfo_children():
-                widget.destroy()
-
-            for menu_item in menus_disponibles:
-                self.crear_tarjeta(menu_item)
-            CTkMessagebox(title="Menú Generado", message="Menús generados correctamente.", icon="info")
+        if ingrediente:
+            self.cargar_ingredientes()
+            CTkMessagebox(title="Éxito", message="Ingrediente agregado correctamente.")
         else:
-            CTkMessagebox(title="Sin Menú", message="No hay menús que se puedan generar con los ingredientes disponibles.", icon="info")
+            CTkMessagebox(title="Error", message="No se pudo agregar el ingrediente.")
 
-    def actualizar_treeview(self):
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+    def crear_menu(self):
+        """Crea un menú en la base de datos."""
+        nombre = self.entry_menu_nombre.get()
+        descripcion = self.entry_menu_descripcion.get()
+        precio = self.entry_menu_precio.get()
+        ingredientes_requeridos = self.obtener_ingredientes_requeridos()
 
-        for ingrediente in self.lista_Ingredientes:
-            self.tree.insert("", "end", values=(ingrediente.nombre, ingrediente.cantidad))
-
-    def eliminar_Ingrediente(self):
-        seleccion = self.tree.selection()
-        if not seleccion:
-            CTkMessagebox(title="Error", message="Por favor selecciona un ingrediente para eliminar.", icon="warning")
+        if not nombre or not descripcion or not precio or not ingredientes_requeridos:
+            CTkMessagebox(title="Error", message="Por favor, completa todos los campos y selecciona ingredientes.", icon="warning")
             return
 
-        for item in seleccion:
-            ingrediente_nombre = self.tree.item(item, "values")[0]
-            self.lista_Ingredientes = [ing for ing in self.lista_Ingredientes if ing.nombre != ingrediente_nombre]
-            self.tree.delete(item)
+        if not precio.replace('.', '', 1).isdigit() or float(precio) <= 0:
+            CTkMessagebox(title="Error", message="El precio debe ser un número positivo.", icon="warning")
+            return
 
-        self.actualizar_treeview()
+        db = next(get_session())
+        menu = MenuCRUD.crear_menu(db, nombre, descripcion, ingredientes_requeridos, float(precio))
+        db.close()
+
+        if menu:
+            CTkMessagebox(title="Éxito", message="Menú creado correctamente.")
+            self.cargar_menus()  # Actualizar la vista
+        else:
+            CTkMessagebox(title="Error", message="No se pudo crear el menú. Verifica los ingredientes disponibles.")
+
+
+    def cargar_ingredientes(self):
+        """Carga los ingredientes desde la base de datos en el Treeview."""
+        db = next(get_session())
+        ingredientes = IngredienteCRUD.leer_ingredientes(db)
+        db.close()
+
+        # Limpiar el Treeview antes de recargar
+        self.tree.delete(*self.tree.get_children())
+
+        # Insertar ingredientes en el Treeview
+        for ingrediente in ingredientes:
+            self.tree.insert("", "end", values=(ingrediente.ID_ingrediente, ingrediente.Nombre, ingrediente.Cantidad))
+
+    def eliminar_ingrediente(self):
+        """Elimina el ingrediente seleccionado en el Treeview."""
+        seleccion = self.tree.selection()
+        if not seleccion:
+            CTkMessagebox(title="Error", message="Por favor, selecciona un ingrediente para eliminar.", icon="warning")
+            return
+
+        id_ingrediente = self.tree.item(seleccion[0], "values")[0]  # ID del ingrediente
+        db = next(get_session())
+        ingrediente_eliminado = IngredienteCRUD.eliminar_ingrediente(db, id_ingrediente)
+        db.close()
+
+        if ingrediente_eliminado:
+            CTkMessagebox(title="Éxito", message="Ingrediente eliminado correctamente.")
+            self.cargar_ingredientes()  # Recargar el Treeview
+        else:
+            CTkMessagebox(title="Error", message="No se pudo eliminar el ingrediente.")
+            
+    def cargar_ingredientes_disponibles(self):
+        """Carga los ingredientes disponibles en la base de datos al combobox."""
+        db = next(get_session())
+        ingredientes = IngredienteCRUD.leer_ingredientes(db)
+        db.close()
+
+        self.combobox_ingredientes["values"] = [ingrediente.Nombre for ingrediente in ingredientes]
+    
+    def agregar_ingrediente_menu(self):
+        """Añade un ingrediente al menú temporalmente (Treeview de ingredientes del menú)."""
+        ingrediente = self.combobox_ingredientes.get()
+        cantidad = self.entry_cantidad_ingrediente.get()
+
+        if not ingrediente or not cantidad.isdigit() or int(cantidad) <= 0:
+            CTkMessagebox(title="Error", message="Seleccione un ingrediente y asegúrese de que la cantidad sea válida.", icon="warning")
+            return
+
+        self.tree_ingredientes_menu.insert("", "end", values=(ingrediente, cantidad))
+        self.entry_cantidad_ingrediente.delete(0, "end")
+
+
+    def obtener_ingredientes_requeridos(self):
+        """Obtiene la lista de ingredientes y cantidades seleccionados para el menú."""
+        ingredientes = []
+        for item in self.tree_ingredientes_menu.get_children():
+            valores = self.tree_ingredientes_menu.item(item, "values")
+            ingredientes.append({"nombre": valores[0], "cantidad": int(valores[1])})
+        return ingredientes
 
     def crear_formulario_cliente(self, parent):
         """Crea el formulario en el Frame superior y el Treeview en el Frame inferior para la gestión de clientes."""
@@ -274,34 +374,9 @@ class PestañasPrincipal(ctk.CTk):
         self.cargar_clientes()
         #self.actualizar_emails_combobox()   Actualizar el Combobox después de eliminar
         db.close()
-
-
-    def configurar_pestana2(self):
-        # Frame para mostrar las tarjetas de menú
-        self.tarjetas_frame = ctk.CTkFrame(self.tab2)
-        self.tarjetas_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-        # Frame para mostrar el pedido
-        self.pedido_frame = ctk.CTkFrame(self.tab2, fg_color="#3C3C3C")
-        self.pedido_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-        # Treeview para el pedido
-        self.tree_pedido = ttk.Treeview(self.pedido_frame, columns=("Nombre", "Cantidad", "Precio"), show="headings")
-        self.tree_pedido.heading("Nombre", text="Nombre del Menú")
-        self.tree_pedido.heading("Cantidad", text="Cantidad")
-        self.tree_pedido.heading("Precio", text="Precio Unitario")
-        self.tree_pedido.pack(expand=True, fill="both", padx=10, pady=10)
-
-        # Total y botones
-        self.total_label = ctk.CTkLabel(self.pedido_frame, text="Total: $0.00")
-        self.total_label.pack(side="left", padx=10, pady=10)
-
-        self.boton_eliminar_menu = ctk.CTkButton(self.pedido_frame, text="Eliminar Menú", command=self.eliminar_menu)
-        self.boton_eliminar_menu.pack(side="left", padx=10, pady=10)
-
-        self.boton_generar_boleta = ctk.CTkButton(self.pedido_frame, text="Generar Boleta", command=self.generar_boleta)
-        self.boton_generar_boleta.pack(side="left", padx=10, pady=10)
-
+        
+        
+    
     def crear_tarjeta(self, menu_item):
     # Ajustar el tamaño del frame según sea necesario
         frame_menu = ctk.CTkFrame(self.tarjetas_frame, width=250, height=250)  # Tamaño ajustado
@@ -323,59 +398,62 @@ class PestañasPrincipal(ctk.CTk):
         label_nombre = ctk.CTkLabel(frame_menu, text=menu_item.nombre, font=("Arial", 12, "bold"))
         label_nombre.pack(pady=5)
 
-    def agregar_al_pedido(self, menu_item):
-    # Verificar si el menú ya está en el pedido
-        for item in self.tree_pedido.get_children():
-            if self.tree_pedido.item(item, "values")[0] == menu_item.nombre:
-                # Convertir la cantidad actual a entero para sumar el nuevo valor
-                cantidad_actual = int(self.tree_pedido.item(item, "values")[1])
-                self.tree_pedido.item(item, values=(menu_item.nombre, cantidad_actual + 1, menu_item.precio))
-                
-                # Actualizar self.pedido
-                for pedido_item in self.pedido:
-                    if pedido_item.nombre == menu_item.nombre:
-                        pedido_item.cantidad += 1
-                        break
-                
-                self.calcular_total()
-                return
-
-        # Si no está en el pedido, añadirlo
-        self.tree_pedido.insert("", "end", values=(menu_item.nombre, 1, menu_item.precio))
-        
-        # Actualizar self.pedido
-        self.pedido.append(MenuItem(menu_item.nombre, menu_item.ingredientes, menu_item.icono_menu, menu_item.precio))
-        self.pedido[-1].cantidad = 1
-        
-        self.calcular_total()
-
     def eliminar_menu(self):
-        seleccion = self.tree_pedido.selection()
+        seleccion = self.tree_menus.selection()
         if not seleccion:
-            CTkMessagebox(title="Error", message="Por favor selecciona un menú para eliminar.", icon="warning")
+            CTkMessagebox(title="Error", message="Por favor, selecciona un menú para eliminar.", icon="warning")
             return
 
-        for item in seleccion:
-            menu_nombre = self.tree_pedido.item(item, "values")[0]
-            self.tree_pedido.delete(item)
+        id_menu = self.tree_menus.item(seleccion[0], "values")[0]
+        db = next(get_session())
+        menu_eliminado = MenuCRUD.eliminar_menu(db, id_menu)
+        db.close()
 
-            # Actualizar self.pedido
-            self.pedido = [pedido_item for pedido_item in self.pedido if pedido_item.nombre != menu_nombre]
+        if menu_eliminado:
+            CTkMessagebox(title="Éxito", message="Menú eliminado correctamente.")
+            self.cargar_menus()  # Actualizar la vista
+        else:
+            CTkMessagebox(title="Error", message="No se pudo eliminar el menú.")
+            
+    def cargar_menus(self):
+        """Carga los menús desde la base de datos en el Treeview."""
+        db = next(get_session())
+        menus = MenuCRUD.leer_menus(db)
+        db.close()
 
-        self.calcular_total()
+        self.tree_menus.delete(*self.tree_menus.get_children())
+
+        for menu in menus:
+            self.tree_menus.insert("", "end", values=(menu.ID_menu, menu.Nombre, menu.Descripcion, f"${menu.Precio}"))
+
 
     def calcular_total(self):
-        total = sum(float(self.tree_pedido.item(item, "values")[2]) * int(self.tree_pedido.item(item, "values")[1]) for item in self.tree_pedido.get_children())
-        self.total_label.configure(text=f"Total: ${total:.2f}")
+        menu_seleccionado = self.combobox_menus.get()
+        cantidad = self.entry_cantidad.get()
+
+        if not menu_seleccionado or not cantidad.isdigit() or int(cantidad) <= 0:
+            CTkMessagebox(title="Error", message="Selecciona un menú y una cantidad válida.", icon="warning")
+            return
+
+        db = next(get_session())
+        menu = MenuCRUD.leer_menu_por_nombre(db, menu_seleccionado)
+        db.close()
+
+        if menu:
+            total = int(cantidad) * menu.Precio
+            self.label_total.configure(text=f"Total: ${total:.2f}")
+        else:
+            CTkMessagebox(title="Error", message="No se encontró el menú seleccionado.", icon="warning")
+
 
 
     #utiliza el ReportLab para generar la boleta, si no lo tienen es una extencion [ pip install ReportLab ]
     def generar_boleta(self):
-        if not self.pedido:
+        if not self.menu:
             CTkMessagebox(title="Error", message="No hay elementos en el pedido para generar una boleta.", icon="warning")
             return
 
-        total_precio = sum(menu_item.precio * menu_item.cantidad for menu_item in self.pedido)
+        total_precio = sum(menu_item.precio * menu_item.cantidad for menu_item in self.menu)
         # Crear el documento PDF
         nombre_archivo = "boleta.pdf"
         pdf = SimpleDocTemplate(nombre_archivo, pagesize=A4)
@@ -394,18 +472,18 @@ class PestañasPrincipal(ctk.CTk):
 
         # Tabla de contenido del pedido
         datos = [["Nombre del Menú", "Cantidad", "Precio Unitario", "Total"]]
-        total_pedido = 0
+        total_menu = 0
         
-        for item in self.pedido:
+        for item in self.menu:
             nombre = item.nombre  # Acceder al atributo 'nombre' del objeto item
             cantidad = item.cantidad  # Acceder al atributo 'cantidad' del objeto item
             precio = item.precio  # Acceder al atributo 'precio' del objeto item
             total = precio * cantidad
             datos.append([nombre, cantidad, f"${precio:.2f}", f"${total:.2f}"])
-            total_pedido += total
+            total_menu += total
 
         # Agregar fila con el total final
-        datos.append(["", "", "Total", f"${total_pedido:.2f}"])
+        datos.append(["", "", "Total", f"${total_menu:.2f}"])
 
         # Crear la tabla en ReportLab
         tabla = Table(datos)
@@ -471,6 +549,101 @@ class PestañasPrincipal(ctk.CTk):
         messagebox.showinfo("Éxito", "Pedido eliminado correctamente.")
         self.cargar_pedidos()
         db.close()
+        
+    
+    def configurar_pestana_panel_compra(self):
+        """Configura la pestaña de Panel de Compra."""
+        # Crear el Frame principal de la pestaña
+        self.tab_panel_compra = ctk.CTkFrame(self.tabview.add("Panel de Compra"))
+        self.tab_panel_compra.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Frame superior para seleccionar cliente y menú
+        frame_seleccion = ctk.CTkFrame(self.tab_panel_compra)
+        frame_seleccion.pack(fill="x", padx=10, pady=10)
+
+        # Selección de cliente
+        ctk.CTkLabel(frame_seleccion, text="Cliente").grid(row=0, column=0, padx=10, pady=5)
+        self.combobox_clientes = ttk.Combobox(frame_seleccion, state="readonly")
+        self.combobox_clientes.grid(row=0, column=1, padx=10, pady=5)
+
+        # Selección de menú
+        ctk.CTkLabel(frame_seleccion, text="Menú").grid(row=1, column=0, padx=10, pady=5)
+        self.combobox_menus = ttk.Combobox(frame_seleccion, state="readonly")
+        self.combobox_menus.grid(row=1, column=1, padx=10, pady=5)
+
+        # Selección de cantidad
+        ctk.CTkLabel(frame_seleccion, text="Cantidad").grid(row=2, column=0, padx=10, pady=5)
+        self.entry_cantidad = ctk.CTkEntry(frame_seleccion)
+        self.entry_cantidad.grid(row=2, column=1, padx=10, pady=5)
+
+        # Botón para calcular el total
+        ctk.CTkButton(frame_seleccion, text="Calcular Total", command=self.calcular_total).grid(row=3, column=0, padx=10, pady=5)
+
+        # Mostrar el total
+        self.label_total = ctk.CTkLabel(frame_seleccion, text="Total: $0.00")
+        self.label_total.grid(row=3, column=1, padx=10, pady=5)
+
+        # Botón para registrar el pedido
+        ctk.CTkButton(self.tab_panel_compra, text="Registrar Pedido", command=self.registrar_pedido).pack(pady=10)
+
+        # Treeview para mostrar pedidos
+        self.tree_pedidos = ttk.Treeview(self.tab_panel_compra, columns=("ID", "Cliente", "Menú", "Cantidad", "Total", "Fecha"), show="headings")
+        self.tree_pedidos.heading("ID", text="ID Pedido")
+        self.tree_pedidos.heading("Cliente", text="Cliente")
+        self.tree_pedidos.heading("Menú", text="Menú")
+        self.tree_pedidos.heading("Cantidad", text="Cantidad")
+        self.tree_pedidos.heading("Total", text="Total")
+        self.tree_pedidos.heading("Fecha", text="Fecha")
+        self.tree_pedidos.pack(fill="both", padx=10, pady=10)
+
+        # Cargar datos iniciales
+        self.cargar_clientesotes()
+        self.cargar_menusotes()
+        self.cargar_pedidos()
+    
+
+
+    def registrar_pedido(self):
+        cliente = self.combobox_clientes.get()
+        menu = self.combobox_menus.get()
+        cantidad = self.entry_cantidad.get()
+        total_text = self.label_total.cget("text").replace("Total: $", "")
+
+        if not cliente or not menu or not cantidad.isdigit() or float(total_text) <= 0:
+            CTkMessagebox(title="Error", message="Completa todos los campos correctamente.", icon="warning")
+            return
+
+        db = next(get_session())
+        pedido = PedidoCRUD.crear_pedido(db, cliente, menu, int(cantidad), float(total_text))
+        db.close()
+
+        if pedido:
+            CTkMessagebox(title="Éxito", message="Pedido registrado correctamente.")
+            self.cargar_pedidos()
+        else:
+            CTkMessagebox(title="Error", message="No se pudo registrar el pedido.")
+            
+    def cargar_clientesotes(self):
+        db = next(get_session())
+        clientes = ClienteCRUD.leer_clientes(db)
+        db.close()
+        self.combobox_clientes["values"] = [cliente.email for cliente in clientes]
+
+    def cargar_menusotes(self):
+        db = next(get_session())
+        menus = MenuCRUD.leer_menus(db)
+        db.close()
+        self.combobox_menus["values"] = [menu.Nombre for menu in menus]
+
+    def cargar_pedidos(self):
+        db = next(get_session())
+        pedidos = PedidoCRUD.leer_pedidos(db)
+        db.close()
+        self.tree_pedidos.delete(*self.tree_pedidos.get_children())
+
+        for pedido in pedidos:
+            self.tree_pedidos.insert("", "end", values=(pedido.ID_pedido, pedido.Correo_cliente, pedido.Menu, pedido.Cantidad, f"${pedido.Total:.2f}", pedido.Fecha.strftime("%Y-%m-%d %H:%M:%S")))
+
 
 class Ingreso_Ingredientes:
     def __init__(self, nombre_ingrediente, cantidad):
