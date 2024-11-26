@@ -51,6 +51,11 @@ class PestañasPrincipal(ctk.CTk):
         self.configurar_pestana1()
         self.configurar_pestana2()
 
+        #Agregue la pestaña de Graficos
+        self.tab_graficos = self.tabview.add("Gráficos")
+        self.configurar_pestana_graficos()
+        #Agregue la pestaña de Graficosle
+
     def configurar_pestana1(self):
         # Frame para ingresar ingredientes
         Window1 = ctk.CTkFrame(self.tab1)
@@ -83,6 +88,7 @@ class PestañasPrincipal(ctk.CTk):
         self.tree.heading("Nombre", text="Nombre Ingrediente")
         self.tree.heading("Cantidad", text="Cantidad")
         self.tree.pack(expand=True, fill="both", padx=10, pady=10)
+        
 
         # Botón para generar menú
         self.boton_generar_menu = ctk.CTkButton(Window1, text="Generar Menú", command=self.generar_menu)
@@ -440,6 +446,45 @@ class PestañasPrincipal(ctk.CTk):
         pdf.build(elementos)
         CTkMessagebox(title="Boleta Generada", message=f"La boleta se ha generado correctamente como '{nombre_archivo}'.", icon="info")
 
+
+
+    #Debido a que la seccion de Graficos es la ultima pagina creare su pagina y todo lo que hara en este espacio :b#
+#----------------------------------------------------------------------------------------------------------------------#
+
+    def configurar_pestana_graficos(self):
+        frame_graficos = ctk.CTkFrame(self.tab_graficos)
+        frame_graficos.pack(fill="both", expand=True, padx=10, pady=10)
+
+        label_graficos = ctk.CTkLabel(frame_graficos, text=" G R A F I C O S")
+        label_graficos.pack(pady=10)
+
+        #contenedor de los botones
+        frame_botones = ctk.CTkFrame(frame_graficos)
+        frame_botones.pack(pady=20)
+
+        #Creacion de botones, hay que colocarle su funcionamiento aun
+        btn_grafico1 = ctk.CTkButton(frame_botones, text="Grafico Diario(?)", command=self.Show_grafico1)
+        btn_grafico1.pack(side="left", padx=10)
+
+        btn_grafico2 = ctk.CTkButton(frame_botones, text="Gráfico Mensual (?)", command=self.Show_grafico2)
+        btn_grafico2.pack(side="left", padx=10)
+
+        btn_grafico3 = ctk.CTkButton(frame_botones, text="Grafico Anual (?)", command=self.Show_grafico3)
+        btn_grafico3.pack(side="left", padx=10)
+
+        
+    #Funciones de los Botones. Necesito las cosas listas para agregarle sus funciones
+    def Show_grafico1(self):
+        print("Mostrando Gráfico 1")
+
+    def Show_grafico2(self):
+        print("Mostrando Gráfico 2")
+
+    def Show_grafico3(self):
+        print("Mostrando Gráfico 3")
+
+#----------------------------------------------------------------------------------------------------------------------#
+    #Debido a que la seccion de Graficos es la ultima pagina creare su pagina y todo lo que hara en este espacio :b#
 
 if __name__ == "__main__":
     app = PestañasPrincipal()
