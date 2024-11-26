@@ -42,6 +42,7 @@ class PestañasPrincipal(ctk.CTk):
         self.configurar_pestana_menus()
         self.configurar_pestana_panel_compra()
         self.cargar_ingredientes()
+        self.configurar_pestana_graficos()
 
     def configurar_pestana1(self):
         # Frame para ingresar ingredientes
