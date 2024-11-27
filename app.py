@@ -11,6 +11,8 @@ from database import get_session, engine, Base
 from crud.ingrediente_crud import IngredienteCRUD
 from crud.pedidos_crud import PedidoCRUD
 from crud.menu_crud import MenuCRUD
+from collections import defaultdict
+from datetime import timedelta
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -49,14 +51,12 @@ class PestañasPrincipal(ctk.CTk):
         self.configurar_pestana_graficos()
 
     def configurar_pestana1(self):
-        # Frame para ingresar ingredientes
         Window1 = ctk.CTkFrame(self.tab1)
         Window1.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
         frame_treeview = ctk.CTkFrame(self.tab1)
         frame_treeview.pack(side="right", fill="both", expand=True, padx=10, pady=10)
 
-        # Formulario de ingredientes
         ctk.CTkLabel(Window1, text="Tipo de Ingrediente: ").pack(pady=5)
         self.combobox_tipo_ingrediente = ttk.Combobox(Window1, state="readonly")
         self.combobox_tipo_ingrediente["values"] = ["masa", "bebestible", "vegetal", "carne"]
@@ -115,7 +115,7 @@ class PestañasPrincipal(ctk.CTk):
         self.entry_menu_precio = ctk.CTkEntry(frame_formulario, placeholder_text="Ingrese el precio del menú")
         self.entry_menu_precio.grid(row=3, column=1, padx=10, pady=5)
 
-        # Selección de ingredientes
+
         ctk.CTkLabel(frame_formulario, text="Ingredientes Disponibles").grid(row=2, column=0, padx=10, pady=5)
         self.combobox_ingredientes = ttk.Combobox(frame_formulario, state="readonly")
         self.combobox_ingredientes.grid(row=2, column=1, padx=10, pady=5)
@@ -360,13 +360,6 @@ class PestañasPrincipal(ctk.CTk):
 
         self.cargar_clientes()
 
-    # Método para actualizar los correos electrónicos en el Combobox
-    # def actualizar_emails_combobox(self):
-    #     """Llena el Combobox con los emails de los clientes."""
-    #     db = next(get_session())
-    #     emails = [cliente.email for cliente in ClienteCRUD.leer_clientes(db)]
-    #     self.combobox_cliente_email['values'] = emails
-    #     db.close()
 
     # Métodos CRUD para Clientes
     def cargar_clientes(self):
@@ -787,8 +780,18 @@ class PestañasPrincipal(ctk.CTk):
         frame_botones.pack(pady=20)
 
         # Botones para seleccionar los gráficos
-        btn_grafico1 = ctk.CTkButton(frame_botones, text="Gráfico Ventas Semanal", command=self.Show_grafico1)
-        btn_grafico1.pack(side="left", padx=10)
+        btn_grafico_diarias = ctk.CTkButton(frame_botones, text="Ventas Diarias", command=lambda: self.Show_grafico1("diarias"))
+        btn_grafico_diarias.pack(side="left", padx=10)
+
+        btn_grafico_semanales = ctk.CTkButton(frame_botones, text="Ventas Semanales", command=lambda: self.Show_grafico1("semanales"))
+        btn_grafico_semanales.pack(side="left", padx=10)
+
+        btn_grafico_mensuales = ctk.CTkButton(frame_botones, text="Ventas Mensuales", command=lambda: self.Show_grafico1("mensuales"))
+        btn_grafico_mensuales.pack(side="left", padx=10)
+
+        btn_grafico_anuales = ctk.CTkButton(frame_botones, text="Ventas Anuales", command=lambda: self.Show_grafico1("anuales"))
+        btn_grafico_anuales.pack(side="left", padx=10)
+
 
         btn_grafico2 = ctk.CTkButton(frame_botones, text="Gráfico Ingredientes Más Usados", command=self.Show_grafico2)
         btn_grafico2.pack(side="left", padx=10)
@@ -800,10 +803,48 @@ class PestañasPrincipal(ctk.CTk):
         self.canvas = None
 
     # Función para obtener las ventas diarias desde la base de datos
-    def obtener_ventas_diarias(self):
-        """Obtiene las ventas diarias desde la base de datos o desde la memoria."""
-        # Si las ventas diarias ya están almacenadas en memoria, las utilizamos
-        return self.ventas_diarias
+    def obtener_ventas_por_fecha(self, rango: str):
+
+        db = next(get_session())
+        pedidos = PedidoCRUD.leer_pedidos(db)
+        db.close()
+
+        # Inicializar valores predeterminados
+        if rango == "diarias":
+            ventas = {f"{hora:02d}:00": 0 for hora in range(24)}  # Horas del día
+        elif rango == "semanales":
+            ventas = {dia: 0 for dia in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]}  # Días de la semana
+        elif rango == "mensuales":
+            ventas = {mes: 0 for mes in ["January", "February", "March", "April", "May", "June",
+                                        "July", "August", "September", "October", "November", "December"]}  # Meses
+        elif rango == "anuales":
+            ventas = {f"Q{i}": 0 for i in range(1, 5)}  # Trimestres del año
+        else:
+            raise ValueError("Rango no válido. Use: 'diarias', 'semanales', 'mensuales' o 'anuales'.")
+
+        # Agregar ventas reales
+        for pedido in pedidos:
+            if rango == "diarias":
+                clave = pedido.Fecha.strftime("%H:00")
+            elif rango == "semanales":
+                clave = pedido.Fecha.strftime("%A")
+            elif rango == "mensuales":
+                clave = pedido.Fecha.strftime("%B")
+            elif rango == "anuales":
+                mes = pedido.Fecha.month
+                if mes <= 3:
+                    clave = "Q1"
+                elif mes <= 6:
+                    clave = "Q2"
+                elif mes <= 9:
+                    clave = "Q3"
+                else:
+                    clave = "Q4"
+
+            ventas[clave] += pedido.Total  # Sumar las ventas al rango correspondiente
+
+        print(f"Ventas para rango {rango}: {ventas}")  # Verificar los datos aquí
+        return dict(sorted(ventas.items()))  # Ordenar las claves para un gráfico organizado
 
     # Función para obtener los ingredientes más usados
     def obtener_ingredientes_mas_usados(self):
@@ -837,32 +878,31 @@ class PestañasPrincipal(ctk.CTk):
         return ingredientes_mas_usados
 
     # Función para obtener el menú más vendido
-    def obtener_menu_mas_vendido(self):
-        """Obtiene el menú más vendido desde la base de datos."""
+    def obtener_menus_mas_vendidos(self, limite=5):
+
         db = next(get_session())
         pedidos = PedidoCRUD.leer_pedidos(db)
         db.close()
 
-        # Contamos cuántas veces se ha vendido cada menú
-        menus = [pedido.Menu for pedido in pedidos]
-        menu_mas_vendido = Counter(menus).most_common(1)  # Devuelve el menú más vendido
-    
-        return menu_mas_vendido[0] if menu_mas_vendido else None
+        # Contar cuántas veces se ha vendido cada menú
+        menu_ventas = Counter(pedido.Menu for pedido in pedidos)
+
+        # Obtener los más vendidos, limitando a 'limite'
+        return menu_ventas.most_common(limite)
 
 
     # Funciones para mostrar los gráficos
-    def Show_grafico1(self):
+    def Show_grafico1(self, rango):
         # Obtener las ventas diarias (actualizadas)
-        ventas_diarias = self.obtener_ventas_diarias()
+        ventas = self.obtener_ventas_por_fecha(rango)
 
-        fig, ax = plt.subplots(figsize=(6, 4))
-        ax.bar(ventas_diarias.keys(), ventas_diarias.values(), color="green")
-        ax.set_title("Ventas Diarias")
-        ax.set_xlabel("Día de la Semana")
-        ax.set_ylabel("Ventas ($)")
-        ax.legend(["Ventas"])
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.bar(ventas.keys(), ventas.values(), color="blue")
+        ax.set_title(f"Ventas {rango.capitalize()}")
+        ax.set_xlabel("Fecha")
+        ax.set_ylabel("Total Ventas ($)")
+        ax.tick_params(axis='x', rotation=45)  # Rotar etiquetas para mayor claridad
 
-        # Mostrar el gráfico en la interfaz
         self.show_graph(fig)
 
 
@@ -883,19 +923,28 @@ class PestañasPrincipal(ctk.CTk):
         self.show_graph(fig)
 
     def Show_grafico3(self):
-        # Obtener el menú más vendido
-        menu_mas_vendido = self.obtener_menu_mas_vendido()
+        """
+        Muestra un gráfico de los menús más vendidos.
+        """
+        menus_mas_vendidos = self.obtener_menus_mas_vendidos()
 
-        fig, ax = plt.subplots(figsize=(6, 4))
-        if menu_mas_vendido:
-            ax.bar(menu_mas_vendido[0], menu_mas_vendido[1], color="orange")
-            ax.set_title("Menú Más Vendido")
-            ax.set_xlabel("Menú")
-            ax.set_ylabel("Ventas ($)")
-            ax.legend(["Ventas"])
+        # Si no hay datos, agrega un valor por defecto
+        if not menus_mas_vendidos:
+            menus_mas_vendidos = [("Sin datos", 0)]
 
-        # Mostrar el gráfico en la interfaz
+        # Separar nombres y cantidades
+        nombres, cantidades = zip(*menus_mas_vendidos)
+
+        # Crear el gráfico
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.bar(nombres, cantidades, color="orange")
+        ax.set_title("Menús Más Vendidos")
+        ax.set_xlabel("Menús")
+        ax.set_ylabel("Cantidad Vendida")
+        ax.tick_params(axis='x', rotation=45)
+
         self.show_graph(fig)
+
 
 
     # Función para mostrar el gráfico
