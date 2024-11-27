@@ -17,6 +17,9 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from collections import Counter
 
 class PestañasPrincipal(ctk.CTk):
     def __init__(self):
@@ -42,7 +45,8 @@ class PestañasPrincipal(ctk.CTk):
         self.configurar_pestana_menus()
         self.configurar_pestana_panel_compra()
         self.cargar_ingredientes()
-        #self.configurar_pestana_graficos()
+        self.tab_graficos = self.tabview.add("Gráficos")
+        self.configurar_pestana_graficos()
 
     def configurar_pestana1(self):
         # Frame para ingresar ingredientes
@@ -563,6 +567,7 @@ class PestañasPrincipal(ctk.CTk):
         if pedido_eliminado:
             CTkMessagebox(title="Éxito", message="Pedido eliminado correctamente.")
             self.cargar_pedidos()  # Recargar el Treeview
+            self.Show_grafico1() 
         else:
             CTkMessagebox(title="Error", message="No se pudo eliminar el pedido.")
 
@@ -654,6 +659,7 @@ class PestañasPrincipal(ctk.CTk):
             if pedido:
                 CTkMessagebox(title="Éxito", message="Pedido registrado correctamente y los ingredientes fueron descontados.")
                 self.cargar_pedidos()
+                self.Show_grafico1()  # Actualizar el gráfico de ventas diarias
             else:
                 CTkMessagebox(title="Error", message="No se pudo registrar el pedido.")
         except ValueError as e:
@@ -768,6 +774,141 @@ class PestañasPrincipal(ctk.CTk):
         pdf.build(elementos)
         CTkMessagebox(title="Boleta Generada", message=f"La boleta se ha generado correctamente como '{nombre_archivo}'.", icon="info")
 
+#-----------------------------------------------------------------------------------------------------------------#    
+    def configurar_pestana_graficos(self):
+        frame_graficos = ctk.CTkFrame(self.tab_graficos)
+        frame_graficos.pack(fill="both", expand=True, padx=10, pady=10)
+
+        label_graficos = ctk.CTkLabel(frame_graficos, text=" G R Á F I C O S")
+        label_graficos.pack(pady=10)
+
+        # Contenedor de los botones
+        frame_botones = ctk.CTkFrame(frame_graficos)
+        frame_botones.pack(pady=20)
+
+        # Botones para seleccionar los gráficos
+        btn_grafico1 = ctk.CTkButton(frame_botones, text="Gráfico Ventas Semanal", command=self.Show_grafico1)
+        btn_grafico1.pack(side="left", padx=10)
+
+        btn_grafico2 = ctk.CTkButton(frame_botones, text="Gráfico Ingredientes Más Usados", command=self.Show_grafico2)
+        btn_grafico2.pack(side="left", padx=10)
+
+        btn_grafico3 = ctk.CTkButton(frame_botones, text="Gráfico Menú Más Vendido", command=self.Show_grafico3)
+        btn_grafico3.pack(side="left", padx=10)
+
+        # Área para mostrar el gráfico generado
+        self.canvas = None
+
+    # Función para obtener las ventas diarias desde la base de datos
+    def obtener_ventas_diarias(self):
+        """Obtiene las ventas diarias desde la base de datos o desde la memoria."""
+        # Si las ventas diarias ya están almacenadas en memoria, las utilizamos
+        return self.ventas_diarias
+
+    # Función para obtener los ingredientes más usados
+    def obtener_ingredientes_mas_usados(self):
+        """Obtiene los ingredientes más usados desde la base de datos."""
+        db = next(get_session())
+        menus = MenuCRUD.leer_menus(db)
+        db.close()
+
+        ingredientes = []
+
+        # Recorremos los menús y obtenemos solo el nombre de cada ingrediente
+        for menu in menus:
+            for ingrediente in menu.Ingredientes:  # Asumimos que cada menú tiene una lista de ingredientes
+                print(f"Ingrediente: {ingrediente}")  # Verificar el tipo de ingrediente
+
+                # Verificar si el ingrediente es un diccionario
+                if isinstance(ingrediente, dict):
+                    nombre_ingrediente = ingrediente.get('nombre')  # Extraemos el nombre del ingrediente
+                    if nombre_ingrediente:
+                        ingredientes.append(nombre_ingrediente)
+                    else:
+                        print(f"Ingrediente inválido (sin 'nombre'): {ingrediente}")  # Mostrar si no tiene 'nombre'
+                elif isinstance(ingrediente, str):
+                    ingredientes.append(ingrediente)  # Si es un string, lo agregamos directamente
+                else:
+                    print(f"Ingrediente inválido (no es dict ni str): {ingrediente}")  # Si no es dict ni string
+
+        # Contamos cuántas veces se ha usado cada ingrediente
+        ingredientes_mas_usados = Counter(ingredientes).most_common(5)  # Los 5 ingredientes más usados
+    
+        return ingredientes_mas_usados
+
+    # Función para obtener el menú más vendido
+    def obtener_menu_mas_vendido(self):
+        """Obtiene el menú más vendido desde la base de datos."""
+        db = next(get_session())
+        pedidos = PedidoCRUD.leer_pedidos(db)
+        db.close()
+
+        # Contamos cuántas veces se ha vendido cada menú
+        menus = [pedido.Menu for pedido in pedidos]
+        menu_mas_vendido = Counter(menus).most_common(1)  # Devuelve el menú más vendido
+    
+        return menu_mas_vendido[0] if menu_mas_vendido else None
+
+
+    # Funciones para mostrar los gráficos
+    def Show_grafico1(self):
+        # Obtener las ventas diarias (actualizadas)
+        ventas_diarias = self.obtener_ventas_diarias()
+
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.bar(ventas_diarias.keys(), ventas_diarias.values(), color="green")
+        ax.set_title("Ventas Diarias")
+        ax.set_xlabel("Día de la Semana")
+        ax.set_ylabel("Ventas ($)")
+        ax.legend(["Ventas"])
+
+        # Mostrar el gráfico en la interfaz
+        self.show_graph(fig)
+
+
+    def Show_grafico2(self):
+        # Obtener los ingredientes más usados
+        ingredientes_mas_usados = self.obtener_ingredientes_mas_usados()
+
+        fig, ax = plt.subplots(figsize=(6, 4))
+        if ingredientes_mas_usados:
+            ingredientes, cantidades = zip(*ingredientes_mas_usados)
+            ax.bar(ingredientes, cantidades, color="purple")
+            ax.set_title("Ingredientes Más Usados")
+            ax.set_xlabel("Ingrediente")
+            ax.set_ylabel("Cantidad Usada")
+            ax.legend(["Ingredientes"])
+
+        # Mostrar el gráfico en la interfaz
+        self.show_graph(fig)
+
+    def Show_grafico3(self):
+        # Obtener el menú más vendido
+        menu_mas_vendido = self.obtener_menu_mas_vendido()
+
+        fig, ax = plt.subplots(figsize=(6, 4))
+        if menu_mas_vendido:
+            ax.bar(menu_mas_vendido[0], menu_mas_vendido[1], color="orange")
+            ax.set_title("Menú Más Vendido")
+            ax.set_xlabel("Menú")
+            ax.set_ylabel("Ventas ($)")
+            ax.legend(["Ventas"])
+
+        # Mostrar el gráfico en la interfaz
+        self.show_graph(fig)
+
+
+    # Función para mostrar el gráfico
+    def show_graph(self, fig):
+        # Si ya hay un gráfico anterior, destruirlo
+        if self.canvas:
+            self.canvas.get_tk_widget().destroy()
+
+        # Mostrar el gráfico generado
+        self.canvas = FigureCanvasTkAgg(fig, master=self.tab_graficos)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
+#-----------------------------------------------------------------------------------------------------------------#  
 
     
 class Ingreso_Ingredientes:
