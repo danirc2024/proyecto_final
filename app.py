@@ -13,6 +13,9 @@ from crud.pedidos_crud import PedidoCRUD
 from crud.menu_crud import MenuCRUD
 from collections import defaultdict
 from datetime import timedelta
+from graficos import generar_grafico_ventas, generar_grafico_ingredientes, generar_grafico_menus
+
+
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -768,6 +771,7 @@ class PestañasPrincipal(ctk.CTk):
         CTkMessagebox(title="Boleta Generada", message=f"La boleta se ha generado correctamente como '{nombre_archivo}'.", icon="info")
 
 #-----------------------------------------------------------------------------------------------------------------#    
+
     def configurar_pestana_graficos(self):
         frame_graficos = ctk.CTkFrame(self.tab_graficos)
         frame_graficos.pack(fill="both", expand=True, padx=10, pady=10)
@@ -775,121 +779,67 @@ class PestañasPrincipal(ctk.CTk):
         label_graficos = ctk.CTkLabel(frame_graficos, text=" G R Á F I C O S")
         label_graficos.pack(pady=10)
 
+        # Contenedor para los gráficos
+        canvas_holder = {"master": self.tab_graficos, "canvas": None}
+
         # Contenedor de los botones
         frame_botones = ctk.CTkFrame(frame_graficos)
         frame_botones.pack(pady=20)
 
-        # Botones para seleccionar los gráficos
-        btn_grafico_diarias = ctk.CTkButton(frame_botones, text="Ventas Diarias", command=lambda: self.Show_grafico1("diarias"))
+        # Botones para gráficos
+        btn_grafico_diarias = ctk.CTkButton(
+            frame_botones,
+            text="Ventas Diarias",
+            command=lambda: generar_grafico_ventas(
+                PedidoCRUD.leer_pedidos(next(get_session())), "diarias", canvas_holder
+            )
+        )
         btn_grafico_diarias.pack(side="left", padx=10)
 
-        btn_grafico_semanales = ctk.CTkButton(frame_botones, text="Ventas Semanales", command=lambda: self.Show_grafico1("semanales"))
+        btn_grafico_semanales = ctk.CTkButton(
+            frame_botones,
+            text="Ventas Semanales",
+            command=lambda: generar_grafico_ventas(
+                PedidoCRUD.leer_pedidos(next(get_session())), "semanales", canvas_holder
+            )
+        )
         btn_grafico_semanales.pack(side="left", padx=10)
 
-        btn_grafico_mensuales = ctk.CTkButton(frame_botones, text="Ventas Mensuales", command=lambda: self.Show_grafico1("mensuales"))
+        btn_grafico_mensuales = ctk.CTkButton(
+            frame_botones,
+            text="Ventas Mensuales",
+            command=lambda: generar_grafico_ventas(
+                PedidoCRUD.leer_pedidos(next(get_session())), "mensuales", canvas_holder
+            )
+        )
         btn_grafico_mensuales.pack(side="left", padx=10)
 
-        btn_grafico_anuales = ctk.CTkButton(frame_botones, text="Ventas Anuales", command=lambda: self.Show_grafico1("anuales"))
+        btn_grafico_anuales = ctk.CTkButton(
+            frame_botones,
+            text="Ventas Anuales",
+            command=lambda: generar_grafico_ventas(
+                PedidoCRUD.leer_pedidos(next(get_session())), "anuales", canvas_holder
+            )
+        )
         btn_grafico_anuales.pack(side="left", padx=10)
 
+        btn_grafico_ingredientes = ctk.CTkButton(
+            frame_botones,
+            text="Ingredientes Más Usados",
+            command=lambda: generar_grafico_ingredientes(
+                MenuCRUD.leer_menus(next(get_session())), canvas_holder
+            )
+        )
+        btn_grafico_ingredientes.pack(side="left", padx=10)
 
-        btn_grafico2 = ctk.CTkButton(frame_botones, text="Gráfico Ingredientes Más Usados", command=self.Show_grafico2)
-        btn_grafico2.pack(side="left", padx=10)
-
-        btn_grafico3 = ctk.CTkButton(frame_botones, text="Gráfico Menú Más Vendido", command=self.Show_grafico3)
-        btn_grafico3.pack(side="left", padx=10)
-
-        # Área para mostrar el gráfico generado
-        self.canvas = None
-
-    # Función para obtener las ventas diarias desde la base de datos
-    def obtener_ventas_por_fecha(self, rango: str):
-
-        db = next(get_session())
-        pedidos = PedidoCRUD.leer_pedidos(db)
-        db.close()
-
-        # Inicializar valores predeterminados
-        if rango == "diarias":
-            ventas = {f"{hora:02d}:00": 0 for hora in range(24)}  # Horas del día
-        elif rango == "semanales":
-            ventas = {dia: 0 for dia in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]}  # Días de la semana
-        elif rango == "mensuales":
-            ventas = {mes: 0 for mes in ["January", "February", "March", "April", "May", "June",
-                                        "July", "August", "September", "October", "November", "December"]}  # Meses
-        elif rango == "anuales":
-            ventas = {f"Q{i}": 0 for i in range(1, 5)}  # Trimestres del año
-        else:
-            raise ValueError("Rango no válido. Use: 'diarias', 'semanales', 'mensuales' o 'anuales'.")
-
-        # Agregar ventas reales
-        for pedido in pedidos:
-            if rango == "diarias":
-                clave = pedido.Fecha.strftime("%H:00")
-            elif rango == "semanales":
-                clave = pedido.Fecha.strftime("%A")
-            elif rango == "mensuales":
-                clave = pedido.Fecha.strftime("%B")
-            elif rango == "anuales":
-                mes = pedido.Fecha.month
-                if mes <= 3:
-                    clave = "Q1"
-                elif mes <= 6:
-                    clave = "Q2"
-                elif mes <= 9:
-                    clave = "Q3"
-                else:
-                    clave = "Q4"
-
-            ventas[clave] += pedido.Total  # Sumar las ventas al rango correspondiente
-
-        print(f"Ventas para rango {rango}: {ventas}")  # Verificar los datos aquí
-        return dict(sorted(ventas.items()))  # Ordenar las claves para un gráfico organizado
-
-    # Función para obtener los ingredientes más usados
-    def obtener_ingredientes_mas_usados(self):
-        """Obtiene los ingredientes más usados desde la base de datos."""
-        db = next(get_session())
-        menus = MenuCRUD.leer_menus(db)
-        db.close()
-
-        ingredientes = []
-
-        # Recorremos los menús y obtenemos solo el nombre de cada ingrediente
-        for menu in menus:
-            for ingrediente in menu.Ingredientes:  # Asumimos que cada menú tiene una lista de ingredientes
-                print(f"Ingrediente: {ingrediente}")  # Verificar el tipo de ingrediente
-
-                # Verificar si el ingrediente es un diccionario
-                if isinstance(ingrediente, dict):
-                    nombre_ingrediente = ingrediente.get('nombre')  # Extraemos el nombre del ingrediente
-                    if nombre_ingrediente:
-                        ingredientes.append(nombre_ingrediente)
-                    else:
-                        print(f"Ingrediente inválido (sin 'nombre'): {ingrediente}")  # Mostrar si no tiene 'nombre'
-                elif isinstance(ingrediente, str):
-                    ingredientes.append(ingrediente)  # Si es un string, lo agregamos directamente
-                else:
-                    print(f"Ingrediente inválido (no es dict ni str): {ingrediente}")  # Si no es dict ni string
-
-        # Contamos cuántas veces se ha usado cada ingrediente
-        ingredientes_mas_usados = Counter(ingredientes).most_common(5)  # Los 5 ingredientes más usados
-    
-        return ingredientes_mas_usados
-
-    # Función para obtener el menú más vendido
-    def obtener_menus_mas_vendidos(self, limite=5):
-
-        db = next(get_session())
-        pedidos = PedidoCRUD.leer_pedidos(db)
-        db.close()
-
-        # Contar cuántas veces se ha vendido cada menú
-        menu_ventas = Counter(pedido.Menu for pedido in pedidos)
-
-        # Obtener los más vendidos, limitando a 'limite'
-        return menu_ventas.most_common(limite)
-
+        btn_grafico_menus = ctk.CTkButton(
+            frame_botones,
+            text="Menús Más Vendidos",
+            command=lambda: generar_grafico_menus(
+                PedidoCRUD.leer_pedidos(next(get_session())), canvas_holder
+            )
+        )
+        btn_grafico_menus.pack(side="left", padx=10)
 
     # Funciones para mostrar los gráficos
     def Show_grafico1(self, rango):
